@@ -1,4 +1,4 @@
-# GC Wildlife Explorer
+# GC Wildlife Viewer
 #
 # Conservation Metrics, Inc 
 # Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet
