@@ -1,4 +1,4 @@
-# GC Wildlife Viewer
+# GC Wildlife Viewer --------
 #
 # Conservation Metrics, Inc 
 # Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet
@@ -118,6 +118,7 @@ load_metadata <- function(path, image_dir, thumb_dir, thumb_width = 300) {
         
         return(meta)
     }
+    stop("CSV path not found: ",path)
 }
 
 # Filters module  --------------------------------------------------------
