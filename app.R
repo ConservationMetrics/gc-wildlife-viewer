@@ -343,17 +343,18 @@ explorerUI <- function(id, height = "80vh") {
 
         .thumb {
           width: 100%%;
-          aspect-ratio: 4 / 3;
           overflow: hidden;
           border-radius: 6px;
           background: #f0f0f0;
           cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .thumb img {
           width: 100%%;
-          height: 100%%;
-          object-fit: cover;
+          height: auto;
           display: block;
         }
       ",
@@ -365,16 +366,19 @@ explorerUI <- function(id, height = "80vh") {
         
         tags$script(
             HTML(sprintf("
-        (function() {
+        $(document).ready(function() {
           const el = document.getElementById('%s');
-          if (!el) return;
+          if (!el) {
+            console.error('Scroll element not found');
+            return;
+          }
 
           el.addEventListener('scroll', function() {
             if (el.scrollTop + el.clientHeight >= el.scrollHeight - 150) {
               Shiny.setInputValue('%s', Math.random(), {priority: 'event'});
             }
           });
-        })();
+        });
       ",
                          ns("scroll"),
                          ns("load_more")
@@ -439,7 +443,6 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger,
                     ),
                     tags$img(
                         src = src,
-                        style = "height:140px;width:100%",
                         loading = "lazy"
                     )
                 )
@@ -684,15 +687,22 @@ ui <- fluidPage(
     drawerUI("image_drawer"),
     
     sidebarLayout(
-        sidebarPanel(width = 2,
-                     h4("Filters"),
-                     filtersUI("filters")
+        sidebarPanel(
+            width = 3,
+            # Map at top of sidebar
+            bslib::card(
+                full_screen = FALSE,
+                card_header("Map"),
+                mapUI("map_main", height="400px")
+            ),
+            # Filters below map
+            hr(),
+            h4("Filters"),
+            filtersUI("filters")
         ),
-        mainPanel(width = 10,
-                  fluidRow(
-                      column(6, mapUI("map_main", height="100%")),
-                      column(6, explorerUI("explorer"))
-                  )
+        mainPanel(
+            width = 9,
+            explorerUI("explorer")
         )
     )
 )
