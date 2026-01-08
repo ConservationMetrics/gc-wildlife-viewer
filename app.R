@@ -8,7 +8,7 @@
 # a intuitive view that could be deployed as part of Guardian Connector CapRover
 # deployments.
 
- 
+
 # Install missing packages  ----------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
                        "sf", "leaflet", "magick")
@@ -166,7 +166,7 @@ filtersServer <- function(id, data){
                     min = dmin,
                     max = dmax,
                     value = c(dmin, dmax),
-                    timeFormat = "%Y-%m-%d"
+                    timeFormat = "%d-%b\n%Y", width = "90%"
                 )
             }
         })
@@ -231,7 +231,7 @@ filtersServer <- function(id, data){
 }
 
 # Map module (Leaflet)  --------------------------------------------------
-mapUI <- function(id, height="600px"){
+mapUI <- function(id, height="200px"){
     ns <- NS(id)
     leafletOutput(ns("map"), height = height)
 }
@@ -323,17 +323,16 @@ mapServer <- function(id, all_sites_df, filtered_sites, selected_site_rv) {
 }
 
 # Explorer module (thumbnails + preview)  --------------------------------
-explorerUI <- function(id, height = "80vh") {
+explorerUI <- function(id) {
     ns <- NS(id)
     
     # Minimal CSS for grid layout and native aspect ratio
     gallery_css <- sprintf("
-        #%s { height: %s; overflow-y: auto; }
         #%s { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 8px; }
         .thumb { width: 100%%; border-radius: 6px; background: #f0f0f0; cursor: pointer; 
                  display: flex; align-items: center; justify-content: center; }
         .thumb img { width: 100%%; height: auto; display: block; }
-    ", ns("scroll"), height, ns("gallery"))
+    ", ns("gallery"))
     
     tagList(
         tags$style(HTML(gallery_css)),
@@ -352,8 +351,11 @@ explorerUI <- function(id, height = "80vh") {
         
         bslib::card(
             full_screen = TRUE,
+            max_height = "calc(100vh - 100px)",
             card_header("Images"),
-            div(id = ns("scroll"),
+            bslib::card_body(
+                id = ns("scroll"),
+                style = "overflow-y: auto;",
                 div(id = ns("gallery"),
                     uiOutput(ns("thumbs"))
                 )
@@ -578,7 +580,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
 }
 
 # App UI  ----------------------------------------------------------------
-ui <- fluidPage(
+ui <- page_fillable(
     theme = bs_theme(bootswatch = "flatly"),
     
     tags$script(HTML("
@@ -596,26 +598,26 @@ ui <- fluidPage(
         });
     ")),
     
-    titlePanel("Guardian connector: Wildlife Viewer"),
+    tags$style(HTML("
+        .bslib-sidebar-layout { height: calc(100vh - 60px); }
+        .sidebar { overflow-y: auto !important; }
+    ")),
+    
+    h3("Guardian Connector: Wildlife Viewer", class = "mb-3"),
     
     drawerUI("image_drawer"),
     
-    sidebarLayout(
-        sidebarPanel(
-            width = 3,
-            style = "height: 100vh; overflow-y: auto; padding: 10px;",
+    layout_sidebar(
+        sidebar = sidebar(padding = 3,
+            width = 370,
             bslib::card(
                 class = "mb-2",
-                card_header("Map", class = "py-1"),
-                mapUI("map_main", height="200px")
+                mapUI("map_main", height = "200px")
             ),
-            h5("Filters", class = "mt-2 mb-2"),
+            # h5("Filters", class = "mt-2 mb-2"),
             filtersUI("filters")
         ),
-        mainPanel(
-            width = 9,
-            explorerUI("explorer")
-        )
+        explorerUI("explorer")
     )
 )
 
