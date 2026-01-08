@@ -1,5 +1,5 @@
 # app.R
-# Camera trap explorer — Leaflet version
+# Camera trap explorer — Leaflet version with right drawer
 library(shiny)
 library(bslib)
 library(dplyr)
@@ -8,9 +8,7 @@ library(janitor)
 library(sf)
 library(leaflet)
 library(magick)
-# -------------------------
-# Config
-# -------------------------
+# Config  ---------------------------------------------------------------
 
 CONFIG <- list(
     data_mount = "D:/git_repos/survey-dashboard-shiny/data_mount",
@@ -29,7 +27,7 @@ CONFIG <- list(
     explorer = list(
         batch_size = 20,
         thumb_height = 140,
-        primary_meta <- c(
+        primary_meta = c(
             "camera",
             "date_time",
             "local_name",
@@ -44,9 +42,7 @@ CONFIG$images$image_dir <- file.path(CONFIG$data_mount, CONFIG$images$image_dir)
 CONFIG$images$thumb_dir <- file.path(CONFIG$data_mount, CONFIG$images$thumb_dir)
 CONFIG$images$csv_path  <- file.path(CONFIG$data_mount, CONFIG$images$csv_file)
 
-# -------------------------
-# Helper: load metadata and generate image thumnails if they do not exist
-# -------------------------
+# Helper: load metadata and generate image thumbnails  ------------------
 load_metadata <- function(
         path,
         image_dir,
@@ -115,14 +111,7 @@ load_metadata <- function(
     }
 }
 
-# for dev
-# meta<-load_metadata(path = CONFIG$images$csv_path,
-#                     image_dir = CONFIG$images$image_dir ,
-#                     thumb_dir = CONFIG$images$thumb_dir)
-
-# -------------------------
-# Filters module 
-# -------------------------
+# Filters module  --------------------------------------------------------
 filtersUI <- function(id){
     ns <- NS(id)
     tagList(
@@ -230,9 +219,7 @@ filtersServer <- function(id, data){
 }
 
 
-# -------------------------
-# Map module (Leaflet)
-# -------------------------
+# Map module (Leaflet)  --------------------------------------------------
 mapUI <- function(id, height="600px"){
     ns <- NS(id)
     leafletOutput(ns("map"), height = height)
@@ -335,9 +322,7 @@ mapServer <- function(id, all_sites_df, filtered_sites, selected_site_rv) {
 
 
 
-# -------------------------
-# Explorer module (thumbnails + preview)
-# -------------------------
+# Explorer module (thumbnails + preview)  --------------------------------
 explorerUI <- function(id, height = "80vh") {
     ns <- NS(id)
     
@@ -410,7 +395,7 @@ explorerUI <- function(id, height = "80vh") {
     )
 }
 
-explorerServer <- function(id, data, selected_site_rv, selected_image_rv,
+explorerServer <- function(id, data, selected_site_rv, drawer_trigger,
                            batch_size = 20) {
     
     moduleServer(id, function(input, output, session) {
@@ -425,7 +410,6 @@ explorerServer <- function(id, data, selected_site_rv, selected_image_rv,
         addResourcePath("thumbs", CONFIG$images$thumb_dir)
         
         n_loaded <- reactiveVal(batch_size)
-        current_index <- reactiveVal(NULL)
         
         observeEvent(input$load_more, {
             df <- items()
@@ -462,71 +446,253 @@ explorerServer <- function(id, data, selected_site_rv, selected_image_rv,
             })
         })
         
-        show_modal <- function(i, df) {
+        observeEvent(input$thumb_click, {
+            df <- items()
+            i <- as.integer(input$thumb_click)
             req(i >= 1, i <= nrow(df))
-            
-            path <- df$image_path[i]
-            meta <- as.list(df[i, , drop = FALSE])
-            
-            showModal(
-                modalDialog(
-                    size = "xl",
-                    easyClose = TRUE,
-                    fluidRow(
-                        column(8,
-                               if (!is.na(path)) tags$img(src = path, style = "width:100%")
-                        ),
-                        column(4,
-                               tags$table(
-                                   class = "table table-sm",
-                                   tags$tbody(
-                                       lapply(names(meta), function(k) {
-                                           tags$tr(tags$th(k), tags$td(as.character(meta[[k]])))
-                                       })
-                                   )
-                               )
-                        )
-                    )
-                )
-            )
-            
-            current_index(i)
             
             # ---- IMPORTANT: selection only ----
             selected_site_rv$site  <- df$site_name[i]
             selected_site_rv$source <- "explorer"
             
-            selected_image_rv$path <- df$image_path[i]
-        }
-        
-        observeEvent(input$thumb_click, {
-            df <- items()
-            show_modal(as.integer(input$thumb_click), df)
+            # Trigger drawer with image data
+            drawer_trigger(list(
+                index = i,
+                data = df[i, , drop = FALSE]
+            ))
+            
         }, ignoreInit = TRUE)
     })
 }
 
 
-# -------------------------
-# App UI
-# -------------------------
+# Image Drawer Module  ---------------------------------------------------
+drawerUI <- function(id) {
+    ns <- NS(id)
+    
+    # Minimal CSS for drawer behavior
+    drawer_css <- "
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9998; display: none; }
+        .drawer-overlay.open { display: block; }
+        .drawer { position: fixed; top: 0; right: -70vw; width: 70vw; height: 100vh; 
+                  background: white; box-shadow: -2px 0 8px rgba(0,0,0,0.15); z-index: 9999; 
+                  transition: right 0.3s ease-in-out; overflow-y: auto; }
+        .drawer.open { right: 0; }
+        .drawer-image { width: 100%; border-radius: 8px; margin-bottom: 16px; }
+        .details-content { display: none; }
+        .details-content.open { display: block; }
+    "
+    
+    tagList(
+        tags$style(HTML(drawer_css)),
+        
+        # Keyboard navigation
+        tags$script(HTML(sprintf("
+            $(document).on('keydown', function(e) {
+                var drawer = document.querySelector('.drawer');
+                if (!drawer || !drawer.classList.contains('open')) return;
+                
+                if (e.key === 'Escape') {
+                    Shiny.setInputValue('%s', true, {priority: 'event'});
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    Shiny.setInputValue('%s', Math.random(), {priority: 'event'});
+                } else if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    Shiny.setInputValue('%s', Math.random(), {priority: 'event'});
+                }
+            });
+        ", ns("close"), ns("prev"), ns("nexxt")))),
+        
+        # Overlay
+        tags$div(
+            class = "drawer-overlay",
+            id = ns("overlay"),
+            onclick = sprintf("Shiny.setInputValue('%s', true, {priority: 'event'});", ns("close"))
+        ),
+        
+        # Drawer
+        tags$div(
+            class = "drawer",
+            id = ns("drawer"),
+            # Header
+            div(
+                class = "d-flex justify-content-between align-items-center p-3 border-bottom bg-light",
+                tags$h5("Image Details", class = "mb-0"),
+                actionButton(ns("close_btn"), "×", 
+                             class = "btn-close", 
+                             onclick = sprintf("Shiny.setInputValue('%s', true, {priority: 'event'});", ns("close")))
+            ),
+            # Content
+            div(class = "p-3", uiOutput(ns("content")))
+        )
+    )
+}
+
+drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$explorer$primary_meta) {
+    moduleServer(id, function(input, output, session) {
+        ns <- session$ns
+        
+        is_open <- reactiveVal(FALSE)
+        details_open <- reactiveVal(FALSE)
+        current_index <- reactiveVal(NULL)
+        
+        # Open drawer when triggered
+        observeEvent(trigger_data(), {
+            req(trigger_data())
+            is_open(TRUE)
+            details_open(FALSE)
+            current_index(trigger_data()$index)
+            session$sendCustomMessage("toggleDrawer", list(open = TRUE))
+        })
+        
+        # Close drawer
+        observeEvent(c(input$close, input$close_btn), {
+            is_open(FALSE)
+            session$sendCustomMessage("toggleDrawer", list(open = FALSE))
+        })
+        
+        # Navigate to previous image
+        observeEvent(input$prev, {
+            req(is_open())
+            df <- all_data()
+            req(df, nrow(df) > 0)
+            
+            idx <- current_index()
+            new_idx <- max(1, idx - 1)
+            
+            if (new_idx != idx) {
+                current_index(new_idx)
+            }
+        })
+        
+        # Navigate to nexxt image
+        observeEvent(input$nexxt, {
+            req(is_open())
+            df <- all_data()
+            req(df, nrow(df) > 0)
+            
+            idx <- current_index()
+            new_idx <- min(nrow(df), idx + 1)
+            
+            if (new_idx != idx) {
+                current_index(new_idx)
+            }
+        })
+        
+        # Toggle details section
+        observeEvent(input$toggle_details, {
+            details_open(!details_open())
+        })
+        
+        output$content <- renderUI({
+            req(current_index())
+            df <- all_data()
+            req(df, nrow(df) > 0)
+            
+            idx <- current_index()
+            row <- df[idx, , drop = FALSE]
+            path <- row$image_path
+            meta <- as.list(row)
+            
+            # Separate primary and additional metadata
+            available_primary <- intersect(primary_fields, names(meta))
+            additional_fields <- setdiff(names(meta), available_primary)
+            
+            # Helper function to format field names
+            format_label <- function(field) {
+                gsub("_", " ", tools::toTitleCase(field))
+            }
+            
+            # Helper function to create metadata row
+            meta_row <- function(field, value) {
+                div(
+                    class = "d-flex justify-content-between py-2 border-bottom",
+                    tags$strong(format_label(field)),
+                    span(as.character(value))
+                )
+            }
+            
+            tagList(
+                # Primary metadata at top
+                div(
+                    class = "mb-3",
+                    # Image counter
+                    div(
+                        class = "text-muted small mb-2",
+                        sprintf("Image %d of %d", idx, nrow(df))
+                    ),
+                    # Primary fields - horizontal layout
+                    lapply(available_primary, function(field) {
+                        tags$span(
+                            class = "me-3",
+                            tags$span(
+                                class = "text-muted small",
+                                paste0(format_label(field), ": ")
+                            ),
+                            tags$span(
+                                class = "fw-bold",
+                                as.character(meta[[field]])
+                            )
+                        )
+                    })
+                ),
+                
+                # Image
+                if (!is.na(path)) {
+                    tags$img(src = path, class = "drawer-image")
+                },
+                
+                # Additional details accordion
+                bslib::accordion(
+                    id = ns("details_accordion"),
+                    bslib::accordion_panel(
+                        "Additional Details",
+                        lapply(additional_fields, function(field) {
+                            meta_row(field, meta[[field]])
+                        })
+                    )
+                )
+            )
+        })
+    })
+}
+
+
+# App UI  ----------------------------------------------------------------
 ui <- fluidPage(
     theme = bs_theme(bootswatch = "flatly"),
+    
+    # Custom message handler for drawer toggle
+    tags$script(HTML("
+    Shiny.addCustomMessageHandler('toggleDrawer', function(message) {
+      const drawer = document.querySelector('.drawer');
+      const overlay = document.querySelector('.drawer-overlay');
+      
+      if (message.open) {
+        drawer.classList.add('open');
+        overlay.classList.add('open');
+      } else {
+        drawer.classList.remove('open');
+        overlay.classList.remove('open');
+      }
+    });
+  ")),
+    
     titlePanel("Guardian connector: Wildlife Viewer"),
+    
+    drawerUI("image_drawer"),
+    
     sidebarLayout(
         sidebarPanel(width = 2,
                      h4("Filters"),
                      filtersUI("filters")
         ),
         mainPanel(width = 10,
-                  # tabsetPanel(id = "main_tabs",
-                  # tabPanel("Split View",
                   fluidRow(
                       column(6, mapUI("map_main", height="100%")),
                       column(6, explorerUI("explorer"))
                   )
-                  # )
-                  # )
         )
     )
 )
@@ -544,8 +710,10 @@ server <- function(input, output, session) {
     
     filters_res <- filtersServer("filters", data = reactive(r_meta()))
     
-    selected_site  <- reactiveValues(site = NULL)
-    selected_image <- reactiveValues(path = NULL)
+    selected_site  <- reactiveValues(site = NULL, source = NULL)
+    
+    # Drawer trigger
+    drawer_data <- reactiveVal(NULL)
     
     # ---- derived availability state ----
     filtered_sites <- reactive({
@@ -553,11 +721,6 @@ server <- function(input, output, session) {
         req(df)
         unique(df$site_name)
     })
-    
-    selected_site <- reactiveValues(
-        site = NULL,
-        source = NULL  # "map" | "explorer"
-    )
     
     # ---- map (always all sites) ----
     mapServer(
@@ -572,7 +735,15 @@ server <- function(input, output, session) {
         "explorer",
         data = reactive(filters_res$filtered()),
         selected_site_rv = selected_site,
-        selected_image_rv = selected_image
+        drawer_trigger = drawer_data
+    )
+    
+    # ---- drawer ----
+    drawerServer(
+        "image_drawer",
+        trigger_data = drawer_data,
+        all_data = reactive(filters_res$filtered()),
+        primary_fields = CONFIG$explorer$primary_meta
     )
     
     # ---- ONLY map clicks update filters ----
@@ -590,7 +761,10 @@ server <- function(input, output, session) {
         sel <- df %>% filter(site_name == selected_site$site)
         
         if (nrow(sel) > 0) {
-            selected_image$path <- sel$image_path[1]
+            drawer_data(list(
+                index = 1,
+                data = sel[1, , drop = FALSE]
+            ))
         }
         
     })
