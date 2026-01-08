@@ -1,5 +1,14 @@
 # app.R
 # Camera trap explorer — Leaflet version with right drawer
+# GC Wildlife Explorer
+#
+# Conservation Metrics, Inc 
+# Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet
+# 4.5 to finalize)
+#
+# This app exposed a map and filters to explore camera trap images.  The goal is
+# a intuitive view that could be deployed as part of Guardian Connector CapRover
+# deployments.
 library(shiny)
 library(bslib)
 library(dplyr)
