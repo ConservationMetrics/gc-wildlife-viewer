@@ -1,5 +1,3 @@
-# app.R
-# Camera trap explorer — Leaflet version with right drawer
 # GC Wildlife Explorer
 #
 # Conservation Metrics, Inc 
@@ -9,6 +7,19 @@
 # This app exposed a map and filters to explore camera trap images.  The goal is
 # a intuitive view that could be deployed as part of Guardian Connector CapRover
 # deployments.
+
+ 
+# Install missing packages  ----------------------------------------------
+required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
+                       "sf", "leaflet", "magick")
+
+missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
+
+if(length(missing_packages) > 0) {
+    message("Installing missing packages: ", paste(missing_packages, collapse = ", "))
+    install.packages(missing_packages, dependencies = TRUE)
+}
+
 library(shiny)
 library(bslib)
 library(dplyr)
