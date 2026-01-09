@@ -8,6 +8,13 @@
 # a intuitive view that could be deployed as part of Guardian Connector CapRover
 # deployments.
 
+# 8 Jan 2026
+#
+# This current version of the app requires 3 data sources: a CSV exported from
+# TimeLapse.exe, a folder of images exported from TimeLapse.exe, and a folder of
+# image thumbnails generated from the timelapse image export. the dataloader
+# will generate the thumbs if they do not exist
+# 
 
 # Install missing packages  ----------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
@@ -32,12 +39,16 @@ library(magick)
 # Config  ---------------------------------------------------------------
 
 CONFIG <- list(
-    data_mount = "D:/git_repos/survey-dashboard-shiny/data_mount",
+    
+    # datalake_mount =  Sys.getenv("DATALAKE_MOUNT"),
+    # gc_wildlife_mount = Sys.getenv("GC_WILDLIFE_MOUNT"),
+    datalake_mount = "D:/CIPDP_camera_trap_exports",
+    gc_wildlife_mount = "D:/gc_wild",
     
     images = list(
-        image_dir = "images",
-        thumb_dir = "images/thumbs",
-        csv_file  = "images/ImageData.csv",
+        image_dir = "TimelapseExport",
+        thumb_dir = "thumbs2",
+        csv_file  = "ImageData.csv",
         thumb_width = 300
     ),
     
@@ -56,30 +67,30 @@ CONFIG <- list(
         )
     )
 )
+# *_user are the files that the user uploaded
+CONFIG$images$image_dir <- file.path(CONFIG$datalake_mount, CONFIG$images$image_dir)
+CONFIG$images$thumb_dir <- file.path(CONFIG$datalake_mount, CONFIG$images$thumb_dir)
+CONFIG$images$csv_path_user  <- file.path(CONFIG$datalake_mount, CONFIG$images$csv_file)
+CONFIG$images$csv_path  <- file.path(CONFIG$gc_wildlife_mount, CONFIG$images$csv_file)
 
-CONFIG$images$image_dir <- file.path(CONFIG$data_mount, CONFIG$images$image_dir)
-CONFIG$images$thumb_dir <- file.path(CONFIG$data_mount, CONFIG$images$thumb_dir)
-CONFIG$images$csv_path  <- file.path(CONFIG$data_mount, CONFIG$images$csv_file)
+# on app initialization we make a copy of the csv file and future app launches
+# use the copy unless reinitialize=TRUE is set.
+# These paths are used for serving files
 
-# Helper: load metadata and generate image thumbnails  ------------------
-load_metadata <- function(path, image_dir, thumb_dir, thumb_width = 300, verbose = TRUE) {
+if(file.exists(CONFIG$images$csv_path_user)&&!file.exists(CONFIG$images$csv_path)){
+    file.copy(CONFIG$images$csv_path_user, CONFIG$images$csv_path)
+} 
+
+
+load_metadata <- function(csv_path, verbose = TRUE) {
     
-    if (!requireNamespace("magick", quietly = TRUE)) {
-        stop("Package 'magick' is required for thumbnail generation. Please install it.")
+    if (!file.exists(csv_path)) {
+        stop("Metadata CSV not found: ", csv_path)
     }
     
-    if (!file.exists(path)) {
-        stop("Metadata CSV not found: ", path)
-    }
+    if (verbose) message("Loading metadata from: ", csv_path)
     
-    if (!dir.exists(thumb_dir)) {
-        if (verbose) message("Creating thumbnail directory: ", thumb_dir)
-        dir.create(thumb_dir, recursive = TRUE)
-    }
-    
-    if (verbose) message("Loading metadata from: ", path)
-    
-    meta <- read.csv(path, stringsAsFactors = FALSE) %>%
+    meta <- read.csv(csv_path, stringsAsFactors = FALSE) %>%
         janitor::clean_names() %>%
         mutate(site_name = camera)
     
@@ -87,13 +98,13 @@ load_metadata <- function(path, image_dir, thumb_dir, thumb_width = 300, verbose
     if(!"site_name" %in% names(meta)) meta$site_name <- meta$camera
     if(!"latitude" %in% names(meta)) meta$latitude <- 0.9 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
     if(!"longitude" %in% names(meta)) meta$longitude <- 34.6 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
-    if(!"image_path" %in% names(meta)) {
-        meta$image_path <- file.path(
-            "camimg",
-            "TimelapseExport",
-            gsub("\\",".", paste0(meta$relative_path,".", meta$file), fixed = TRUE)
-        )
-    }
+    
+    meta$image_path_flat <- file.path(
+        gsub("\\", ".", paste0(meta$relative_path, ".", meta$file), fixed = TRUE)
+    )
+    
+    meta$image_path<-gsub("\\\\", "/", file.path(meta$relative_path,  meta$file))
+    meta$thumb_path<-gsub("\\\\", "/", file.path(meta$relative_path,  meta$file))
     
     # Date-time parsing
     if (verbose) message("Parsing date-time values...")
@@ -102,39 +113,19 @@ load_metadata <- function(path, image_dir, thumb_dir, thumb_width = 300, verbose
                                      tryFormats = c("%Y-%m-%dT%H:%M:%OS",
                                                     "%Y-%m-%d %H:%M:%OS",
                                                     "%Y-%m-%d"))
-    } else meta$date_time <- NA
+    } else {
+        meta$date_time <- NA
+    }
     
-    # Generate thumbnails
-    if (verbose) message("Generating thumbnails (this may take a while)...")
-    n_images <- nrow(meta)
-    
-    meta$thumb_path <- sapply(seq_len(n_images), function(idx) {
-        img_path <- meta$image_path[idx]
-        full_path <- file.path(image_dir, gsub("camimg/","", img_path))
-        
-        if (!file.exists(full_path)) return(NA)
-        
-        thumb_file <- file.path(thumb_dir, paste0(basename(img_path)))
-        
-        if (!file.exists(thumb_file)) {
-            if (verbose && idx %% 100 == 0) {
-                message(sprintf("  Processing thumbnail %d of %d (%.1f%%)", 
-                                idx, n_images, (idx/n_images)*100))
-            }
-            try({
-                magick::image_read(full_path) %>%
-                    magick::image_scale(paste0(thumb_width)) %>%
-                    magick::image_write(thumb_file)
-            }, silent = TRUE)
-        }
-        file.path("thumbs", basename(img_path))
-    })
-    
-    if (verbose) message("Data loading complete! Loaded ", nrow(meta), " images from ", 
-                         length(unique(meta$site_name)), " sites.")
+    if (verbose) {
+        message("Metadata loading complete! Loaded ", nrow(meta), " records from ", 
+                length(unique(meta$site_name)), " sites.")
+    }
     
     return(meta)
 }
+
+
 
 # =============================================================================
 # DATA LOADING - Industry standard: Load data before app initialization
@@ -149,10 +140,7 @@ cat("\n")
 # Load and prepare data before app starts
 META_DATA <- tryCatch({
     load_metadata(
-        path = CONFIG$images$csv_path,
-        image_dir = CONFIG$images$image_dir,
-        thumb_dir = CONFIG$images$thumb_dir,
-        thumb_width = CONFIG$images$thumb_width,
+        csv_path = CONFIG$images$csv_path,
         verbose = TRUE
     )
 }, error = function(e) {
@@ -167,6 +155,120 @@ META_DATA <- tryCatch({
     cat("\n")
     stop(e)
 })
+
+# unflatten folder structure if exported from timelapse
+unflatten_paths <- function(meta, image_dir, verbose = TRUE) {
+    
+    if (verbose) message("Unflattening folder structure for image paths...")
+    
+    
+    meta$full_path_flat <- file.path(image_dir, meta$image_path_flat)
+    meta$full_path <- file.path(image_dir, meta$image_path)
+    lapply(unique( dirname(meta$full_path)),function(x)dir.create(x,recursive = T,showWarnings = F))
+    file.rename(meta$full_path_flat, meta$full_path)
+    
+    
+}
+
+# if not all the paths exist
+if(!all(file.exists(file.path(CONFIG$images$image_dir,META_DATA$image_path)))){
+    unflatten_paths(META_DATA, CONFIG$images$image_dir)
+}
+
+# genereate thumb nails
+generate_thumbnails <- function(meta, image_dir, thumb_dir, thumb_width = 300, verbose = TRUE) {
+    
+    # Check dependencies
+    if (!requireNamespace("magick", quietly = TRUE)) {
+        stop("Package 'magick' is required. Please install it with: install.packages('magick')")
+    }
+    
+    if (verbose) message("Preparing thumbnail generation...")
+    
+    # Setup: Build paths
+    meta$full_image_path <- file.path(image_dir, meta$image_path)
+    meta$thumb_path <- file.path(thumb_dir, meta$image_path)
+    meta$file_exists <- file.exists(meta$full_image_path)
+    
+    # Setup: Create all needed thumbnail directories
+    unique_dirs <- unique(dirname(meta$thumb_path))
+    lapply(unique_dirs, function(d) dir.create(d, recursive = TRUE, showWarnings = FALSE))
+    
+    # Count what we're working with
+    n_total <- nrow(meta)
+    n_missing <- sum(!meta$file_exists)
+    n_to_process <- sum(meta$file_exists)
+    
+    if (verbose) {
+        message(sprintf("Found %d images (%d missing, %d to process)", 
+                        n_total, n_missing, n_to_process))
+        message("Generating thumbnails...")
+    }
+    
+    # Counters
+    n_generated <- 0
+    n_skipped <- 0
+    n_failed <- 0
+    
+    # Process each image
+    for (idx in seq_len(n_total)) {
+        
+        # Skip missing files
+        if (!meta$file_exists[idx] || is.na(meta$full_image_path[idx])) {
+            meta$thumb_path[idx] <- NA
+            n_failed <- n_failed + 1
+            next
+        }
+        
+        source_file <- meta$full_image_path[idx]
+        thumb_file <- meta$thumb_path[idx]
+        
+        # Skip if thumbnail already exists
+        if (file.exists(thumb_file)) {
+            n_skipped <- n_skipped + 1
+            next
+        }
+        
+        # Generate thumbnail
+        success <- tryCatch({
+            magick::image_read(source_file) %>%
+                magick::image_scale(paste0(thumb_width)) %>%
+                magick::image_write(thumb_file)
+            TRUE
+        }, error = function(e) {
+            FALSE
+        })
+        
+        if (success) {
+            n_generated <- n_generated + 1
+        } else {
+            meta$thumb_path[idx] <- NA
+            n_failed <- n_failed + 1
+        }
+        
+        # Progress report every 100 images
+        if (verbose && idx %% 100 == 0) {
+            message(sprintf("  %d/%d (%.1f%%) | New: %d | Exists: %d | Failed: %d", 
+                            idx, n_total, (idx/n_total)*100, 
+                            n_generated, n_skipped, n_failed))
+        }
+    }
+    
+    # Final summary
+    if (verbose) {
+        message("Thumbnail generation complete!")
+        message(sprintf("  Total: %d | Generated: %d | Already existed: %d | Failed: %d", 
+                        n_total, n_generated, n_skipped, n_failed))
+    }
+    
+    # return(meta)
+}
+
+# only makes thumb if doesn't exist
+generate_thumbnails(meta = meta,
+                    image_dir = CONFIG$images$image_dir,
+                    thumb_dir = CONFIG$images$thumb_dir,
+                    thumb_width = CONFIG$images$thumb_width)
 
 cat("\n")
 cat("================================================================================\n")
@@ -447,9 +549,10 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
             lapply(seq_len(nrow(df)), function(i) {
                 row <- df[i, , drop = FALSE]
                 src <- if (!is.na(row$thumb_path) && nzchar(row$thumb_path)) {
-                    row$thumb_path
+                    file.path("thumbs",row$thumb_path)
                 } else {
-                    row$image_path
+                    file.path("camimg",row$image_path)
+                    
                 }
                 
                 tags$div(
@@ -616,7 +719,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
                 ),
                 
                 if (!is.na(row$image_path)) {
-                    tags$img(src = row$image_path, class = "drawer-image")
+                    tags$img(src = file.path("camimg",row$image_path), class = "drawer-image")
                 },
                 
                 bslib::accordion(
