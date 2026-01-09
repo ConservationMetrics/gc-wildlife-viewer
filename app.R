@@ -1,20 +1,18 @@
 # GC Wildlife Viewer --------
 #
 # Conservation Metrics, Inc 
-# Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet
-# 4.5 to finalize)
+# Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet 4.5 to finalize)
 #
-# This app exposed a map and filters to explore camera trap images.  The goal is
-# a intuitive view that could be deployed as part of Guardian Connector CapRover
+# This app exposes a map and filters to explore camera trap images. The goal is
+# an intuitive view that could be deployed as part of Guardian Connector CapRover
 # deployments.
-
+#
 # 8 Jan 2026
 #
 # This current version of the app requires 3 data sources: a CSV exported from
 # TimeLapse.exe, a folder of images exported from TimeLapse.exe, and a folder of
-# image thumbnails generated from the timelapse image export. the dataloader
-# will generate the thumbs if they do not exist
-# 
+# image thumbnails generated from the timelapse image export. The dataloader
+# will generate the thumbs if they do not exist.
 
 # Install missing packages  ----------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
@@ -39,7 +37,6 @@ library(magick)
 # Config  ---------------------------------------------------------------
 
 CONFIG <- list(
-    
     # datalake_mount =  Sys.getenv("DATALAKE_MOUNT"),
     # gc_wildlife_mount = Sys.getenv("GC_WILDLIFE_MOUNT"),
     datalake_mount = "D:/CIPDP_camera_trap_exports",
@@ -67,17 +64,16 @@ CONFIG <- list(
         )
     )
 )
-# *_user are the files that the user uploaded
+
+# Set up file paths
 CONFIG$images$image_dir <- file.path(CONFIG$datalake_mount, CONFIG$images$image_dir)
 CONFIG$images$thumb_dir <- file.path(CONFIG$datalake_mount, CONFIG$images$thumb_dir)
 CONFIG$images$csv_path_user  <- file.path(CONFIG$datalake_mount, CONFIG$images$csv_file)
 CONFIG$images$csv_path  <- file.path(CONFIG$gc_wildlife_mount, CONFIG$images$csv_file)
 
-# on app initialization we make a copy of the csv file and future app launches
+# On app initialization we make a copy of the csv file and future app launches
 # use the copy unless reinitialize=TRUE is set.
-# These paths are used for serving files
-
-if(file.exists(CONFIG$images$csv_path_user)&&!file.exists(CONFIG$images$csv_path)){
+if(file.exists(CONFIG$images$csv_path_user) && !file.exists(CONFIG$images$csv_path)){
     file.copy(CONFIG$images$csv_path_user, CONFIG$images$csv_path)
 } 
 
@@ -99,12 +95,14 @@ load_metadata <- function(csv_path, verbose = TRUE) {
     if(!"latitude" %in% names(meta)) meta$latitude <- 0.9 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
     if(!"longitude" %in% names(meta)) meta$longitude <- 34.6 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
     
+    # Build flattened path (for TimeLapse exports with backslashes)
     meta$image_path_flat <- file.path(
         gsub("\\", ".", paste0(meta$relative_path, ".", meta$file), fixed = TRUE)
     )
     
-    meta$image_path<-gsub("\\\\", "/", file.path(meta$relative_path,  meta$file))
-    meta$thumb_path<-gsub("\\\\", "/", file.path(meta$relative_path,  meta$file))
+    # Build proper hierarchical paths
+    meta$image_path <- gsub("\\\\", "/", file.path(meta$relative_path, meta$file))
+    meta$thumb_path <- gsub("\\\\", "/", file.path(meta$relative_path, meta$file))
     
     # Date-time parsing
     if (verbose) message("Parsing date-time values...")
@@ -126,56 +124,46 @@ load_metadata <- function(csv_path, verbose = TRUE) {
 }
 
 
-
-# =============================================================================
-# DATA LOADING - Industry standard: Load data before app initialization
-# =============================================================================
-
-cat("\n")
-cat("================================================================================\n")
-cat("  Guardian Connector: Wildlife Viewer - Data Initialization\n")
-cat("================================================================================\n")
-cat("\n")
-
-# Load and prepare data before app starts
-META_DATA <- tryCatch({
-    load_metadata(
-        csv_path = CONFIG$images$csv_path,
-        verbose = TRUE
-    )
-}, error = function(e) {
-    cat("\n")
-    cat("ERROR: Failed to load data\n")
-    cat("Message: ", e$message, "\n")
-    cat("\n")
-    cat("Please check:\n")
-    cat("  1. CONFIG$data_mount path is correct\n")
-    cat("  2. ImageData.csv exists in that location\n")
-    cat("  3. Image files are accessible\n")
-    cat("\n")
-    stop(e)
-})
-
-# unflatten folder structure if exported from timelapse
 unflatten_paths <- function(meta, image_dir, verbose = TRUE) {
     
     if (verbose) message("Unflattening folder structure for image paths...")
     
-    
+    # Build full paths
     meta$full_path_flat <- file.path(image_dir, meta$image_path_flat)
     meta$full_path <- file.path(image_dir, meta$image_path)
-    lapply(unique( dirname(meta$full_path)),function(x)dir.create(x,recursive = T,showWarnings = F))
-    file.rename(meta$full_path_flat, meta$full_path)
     
+    # Create directory structure
+    unique_dirs <- unique(dirname(meta$full_path))
+    lapply(unique_dirs, function(x) dir.create(x, recursive = TRUE, showWarnings = FALSE))
     
+    # Rename files from flat to hierarchical structure
+    n_renamed <- 0
+    n_failed <- 0
+    
+    for (i in seq_len(nrow(meta))) {
+        if (file.exists(meta$full_path_flat[i]) && !file.exists(meta$full_path[i])) {
+            success <- tryCatch({
+                file.rename(meta$full_path_flat[i], meta$full_path[i])
+                TRUE
+            }, error = function(e) FALSE)
+            
+            if (success) {
+                n_renamed <- n_renamed + 1
+            } else {
+                n_failed <- n_failed + 1
+            }
+        }
+    }
+    
+    if (verbose) {
+        message("Unflattening complete!")
+        message(sprintf("  Files renamed: %d | Failed: %d", n_renamed, n_failed))
+    }
+    
+    # return(meta)
 }
 
-# if not all the paths exist
-if(!all(file.exists(file.path(CONFIG$images$image_dir,META_DATA$image_path)))){
-    unflatten_paths(META_DATA, CONFIG$images$image_dir)
-}
 
-# genereate thumb nails
 generate_thumbnails <- function(meta, image_dir, thumb_dir, thumb_width = 300, verbose = TRUE) {
     
     # Check dependencies
@@ -187,7 +175,7 @@ generate_thumbnails <- function(meta, image_dir, thumb_dir, thumb_width = 300, v
     
     # Setup: Build paths
     meta$full_image_path <- file.path(image_dir, meta$image_path)
-    meta$thumb_path <- file.path(thumb_dir, meta$image_path)
+    meta$thumb_path <- file.path(thumb_dir, meta$thumb_path)
     meta$file_exists <- file.exists(meta$full_image_path)
     
     # Setup: Create all needed thumbnail directories
@@ -264,17 +252,68 @@ generate_thumbnails <- function(meta, image_dir, thumb_dir, thumb_width = 300, v
     # return(meta)
 }
 
-# only makes thumb if doesn't exist
-generate_thumbnails(meta = meta,
-                    image_dir = CONFIG$images$image_dir,
-                    thumb_dir = CONFIG$images$thumb_dir,
-                    thumb_width = CONFIG$images$thumb_width)
 
 cat("\n")
 cat("================================================================================\n")
-cat("  Ready to launch app!\n")
+cat("  Guardian Connector: Wildlife Viewer - Data Initialization\n")
 cat("================================================================================\n")
 cat("\n")
+
+# Load and prepare data before app starts
+META_DATA <- tryCatch({
+    
+    # Step 1: Load metadata
+    cat("STEP 1: Loading metadata...\n")
+    meta <- load_metadata(
+        csv_path = CONFIG$images$csv_path,
+        verbose = TRUE
+    )
+    
+    # Step 2: Unflatten folder structure if needed
+    cat("\nSTEP 2: Checking folder structure...\n")
+    if (!all(file.exists(file.path(CONFIG$images$image_dir, meta$image_path)))) {
+        unflatten_paths(
+            meta = meta,
+            image_dir = CONFIG$images$image_dir,
+            verbose = TRUE
+        )
+    } else {
+        message("Folder structure already correct, skipping unflatten step.")
+    }
+    
+    # Step 3: Generate thumbnails
+    cat("\nSTEP 3: Generating thumbnails...\n")
+    generate_thumbnails(
+        meta = meta,
+        image_dir = CONFIG$images$image_dir,
+        thumb_dir = CONFIG$images$thumb_dir,
+        thumb_width = CONFIG$images$thumb_width,
+        verbose = TRUE
+    )
+    
+    cat("\n")
+    cat("================================================================================\n")
+    cat("  Data initialization complete!\n")
+    cat("================================================================================\n")
+    cat("\n")
+    
+    meta
+    
+}, error = function(e) {
+    cat("\n")
+    cat("================================================================================\n")
+    cat("  ERROR: Failed to load data\n")
+    cat("================================================================================\n")
+    cat("Message: ", e$message, "\n")
+    cat("\n")
+    cat("Please check:\n")
+    cat("  1. CONFIG paths are correct\n")
+    cat("  2. ImageData.csv exists at: ", CONFIG$images$csv_path, "\n")
+    cat("  3. Image files are accessible at: ", CONFIG$images$image_dir, "\n")
+    cat("  4. Thumbnail directory is writable: ", CONFIG$images$thumb_dir, "\n")
+    cat("\n")
+    stop(e)
+})
 
 # Filters module  --------------------------------------------------------
 filtersUI <- function(id){
@@ -527,7 +566,7 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
         items <- reactive({
             df <- data()
             req(df)
-            df |> arrange(desc(date_time))
+            df %>% arrange(desc(date_time))
         })
         
         addResourcePath("camimg", CONFIG$images$image_dir)
@@ -548,11 +587,12 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
             
             lapply(seq_len(nrow(df)), function(i) {
                 row <- df[i, , drop = FALSE]
+                
+                # Use thumbnail if available, otherwise use full image
                 src <- if (!is.na(row$thumb_path) && nzchar(row$thumb_path)) {
-                    file.path("thumbs",row$thumb_path)
+                    file.path("thumbs", row$thumb_path)
                 } else {
-                    file.path("camimg",row$image_path)
-                    
+                    file.path("camimg", row$image_path)
                 }
                 
                 tags$div(
@@ -611,7 +651,7 @@ drawerUI <- function(id) {
                 Shiny.setInputValue('%s', Math.random(), {priority: 'event'});
             }
         });
-    ", ns("close"), ns("prev"), ns("nexxt"))
+    ", ns("close"), ns("prev"), ns("next_img"))
     
     tagList(
         tags$style(HTML(drawer_css)),
@@ -667,7 +707,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
             if (new_idx != idx) current_index(new_idx)
         })
         
-        observeEvent(input$nexxt, {
+        observeEvent(input$next_img, {
             req(is_open())
             df <- all_data()
             req(df, nrow(df) > 0)
@@ -719,7 +759,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
                 ),
                 
                 if (!is.na(row$image_path)) {
-                    tags$img(src = file.path("camimg",row$image_path), class = "drawer-image")
+                    tags$img(src = file.path("camimg", row$image_path), class = "drawer-image")
                 },
                 
                 bslib::accordion(
