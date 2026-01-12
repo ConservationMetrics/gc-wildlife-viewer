@@ -34,6 +34,9 @@ library(sf)
 library(leaflet)
 library(magick)
 
+# load cuostom functions
+source("utils.r")
+
 # Config  ---------------------------------------------------------------
 
 CONFIG <- list(
@@ -69,189 +72,15 @@ CONFIG <- list(
 CONFIG$images$image_dir <- file.path(CONFIG$datalake_mount, CONFIG$images$image_dir)
 CONFIG$images$thumb_dir <- file.path(CONFIG$datalake_mount, CONFIG$images$thumb_dir)
 CONFIG$images$csv_path_user  <- file.path(CONFIG$datalake_mount, CONFIG$images$csv_file)
+
+# safe path for tabular data
 CONFIG$images$csv_path  <- file.path(CONFIG$gc_wildlife_mount, CONFIG$images$csv_file)
 
 # On app initialization we make a copy of the csv file and future app launches
-# use the copy unless reinitialize=TRUE is set.
+# only recopy if there is no copy at the destination
 if(file.exists(CONFIG$images$csv_path_user) && !file.exists(CONFIG$images$csv_path)){
     file.copy(CONFIG$images$csv_path_user, CONFIG$images$csv_path)
-} 
-
-
-load_metadata <- function(csv_path, verbose = TRUE) {
-    
-    if (!file.exists(csv_path)) {
-        stop("Metadata CSV not found: ", csv_path)
-    }
-    
-    if (verbose) message("Loading metadata from: ", csv_path)
-    
-    meta <- read.csv(csv_path, stringsAsFactors = FALSE) %>%
-        janitor::clean_names() %>%
-        mutate(site_name = camera)
-    
-    # Data spoofer - remove when using real dataset
-    if(!"site_name" %in% names(meta)) meta$site_name <- meta$camera
-    if(!"latitude" %in% names(meta)) meta$latitude <- 0.9 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
-    if(!"longitude" %in% names(meta)) meta$longitude <- 34.6 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
-    
-    # Build flattened path (for TimeLapse exports with backslashes)
-    meta$image_path_flat <- file.path(
-        gsub("\\", ".", paste0(meta$relative_path, ".", meta$file), fixed = TRUE)
-    )
-    
-    # Build proper hierarchical paths
-    meta$image_path <- gsub("\\\\", "/", file.path(meta$relative_path, meta$file))
-    meta$thumb_path <- gsub("\\\\", "/", file.path(meta$relative_path, meta$file))
-    
-    # Date-time parsing
-    if (verbose) message("Parsing date-time values...")
-    if("date_time" %in% names(meta)){
-        meta$date_time <- as.POSIXct(meta$date_time, tz = "UTC",
-                                     tryFormats = c("%Y-%m-%dT%H:%M:%OS",
-                                                    "%Y-%m-%d %H:%M:%OS",
-                                                    "%Y-%m-%d"))
-    } else {
-        meta$date_time <- NA
-    }
-    
-    if (verbose) {
-        message("Metadata loading complete! Loaded ", nrow(meta), " records from ", 
-                length(unique(meta$site_name)), " sites.")
-    }
-    
-    return(meta)
 }
-
-
-unflatten_paths <- function(meta, image_dir, verbose = TRUE) {
-    
-    if (verbose) message("Unflattening folder structure for image paths...")
-    
-    # Build full paths
-    meta$full_path_flat <- file.path(image_dir, meta$image_path_flat)
-    meta$full_path <- file.path(image_dir, meta$image_path)
-    
-    # Create directory structure
-    unique_dirs <- unique(dirname(meta$full_path))
-    lapply(unique_dirs, function(x) dir.create(x, recursive = TRUE, showWarnings = FALSE))
-    
-    # Rename files from flat to hierarchical structure
-    n_renamed <- 0
-    n_failed <- 0
-    
-    for (i in seq_len(nrow(meta))) {
-        if (file.exists(meta$full_path_flat[i]) && !file.exists(meta$full_path[i])) {
-            success <- tryCatch({
-                file.rename(meta$full_path_flat[i], meta$full_path[i])
-                TRUE
-            }, error = function(e) FALSE)
-            
-            if (success) {
-                n_renamed <- n_renamed + 1
-            } else {
-                n_failed <- n_failed + 1
-            }
-        }
-    }
-    
-    if (verbose) {
-        message("Unflattening complete!")
-        message(sprintf("  Files renamed: %d | Failed: %d", n_renamed, n_failed))
-    }
-    
-    # return(meta)
-}
-
-
-generate_thumbnails <- function(meta, image_dir, thumb_dir, thumb_width = 300, verbose = TRUE) {
-    
-    # Check dependencies
-    if (!requireNamespace("magick", quietly = TRUE)) {
-        stop("Package 'magick' is required. Please install it with: install.packages('magick')")
-    }
-    
-    if (verbose) message("Preparing thumbnail generation...")
-    
-    # Setup: Build paths
-    meta$full_image_path <- file.path(image_dir, meta$image_path)
-    meta$thumb_path <- file.path(thumb_dir, meta$thumb_path)
-    meta$file_exists <- file.exists(meta$full_image_path)
-    
-    # Setup: Create all needed thumbnail directories
-    unique_dirs <- unique(dirname(meta$thumb_path))
-    lapply(unique_dirs, function(d) dir.create(d, recursive = TRUE, showWarnings = FALSE))
-    
-    # Count what we're working with
-    n_total <- nrow(meta)
-    n_missing <- sum(!meta$file_exists)
-    n_to_process <- sum(meta$file_exists)
-    
-    if (verbose) {
-        message(sprintf("Found %d images (%d missing, %d to process)", 
-                        n_total, n_missing, n_to_process))
-        message("Generating thumbnails...")
-    }
-    
-    # Counters
-    n_generated <- 0
-    n_skipped <- 0
-    n_failed <- 0
-    
-    # Process each image
-    for (idx in seq_len(n_total)) {
-        
-        # Skip missing files
-        if (!meta$file_exists[idx] || is.na(meta$full_image_path[idx])) {
-            meta$thumb_path[idx] <- NA
-            n_failed <- n_failed + 1
-            next
-        }
-        
-        source_file <- meta$full_image_path[idx]
-        thumb_file <- meta$thumb_path[idx]
-        
-        # Skip if thumbnail already exists
-        if (file.exists(thumb_file)) {
-            n_skipped <- n_skipped + 1
-            next
-        }
-        
-        # Generate thumbnail
-        success <- tryCatch({
-            magick::image_read(source_file) %>%
-                magick::image_scale(paste0(thumb_width)) %>%
-                magick::image_write(thumb_file)
-            TRUE
-        }, error = function(e) {
-            FALSE
-        })
-        
-        if (success) {
-            n_generated <- n_generated + 1
-        } else {
-            meta$thumb_path[idx] <- NA
-            n_failed <- n_failed + 1
-        }
-        
-        # Progress report every 100 images
-        if (verbose && idx %% 100 == 0) {
-            message(sprintf("  %d/%d (%.1f%%) | New: %d | Exists: %d | Failed: %d", 
-                            idx, n_total, (idx/n_total)*100, 
-                            n_generated, n_skipped, n_failed))
-        }
-    }
-    
-    # Final summary
-    if (verbose) {
-        message("Thumbnail generation complete!")
-        message(sprintf("  Total: %d | Generated: %d | Already existed: %d | Failed: %d", 
-                        n_total, n_generated, n_skipped, n_failed))
-    }
-    
-    # return(meta)
-}
-
 
 cat("\n")
 cat("================================================================================\n")
