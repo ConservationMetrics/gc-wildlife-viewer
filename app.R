@@ -62,7 +62,7 @@ CONFIG$images$thumb_dir <- file.path(CONFIG$data_mount, CONFIG$images$thumb_dir)
 CONFIG$images$csv_path  <- file.path(CONFIG$data_mount, CONFIG$images$csv_file)
 
 # Helper: load metadata and generate image thumbnails  ------------------
-load_metadata <- function(path, image_dir, thumb_dir, thumb_width = 300, verbose = TRUE) {
+load_metadata <- function(path, image_dir, thumb_dir, thumb_width = 300) {
     
     if (!requireNamespace("magick", quietly = TRUE)) {
         stop("Package 'magick' is required for thumbnail generation. Please install it.")
@@ -72,107 +72,54 @@ load_metadata <- function(path, image_dir, thumb_dir, thumb_width = 300, verbose
         stop("Metadata CSV not found: ", path)
     }
     
-    if (!dir.exists(thumb_dir)) {
-        if (verbose) message("Creating thumbnail directory: ", thumb_dir)
-        dir.create(thumb_dir, recursive = TRUE)
-    }
+    if (!dir.exists(thumb_dir)) dir.create(thumb_dir, recursive = TRUE)
     
-    if (verbose) message("Loading metadata from: ", path)
-    
-    meta <- read.csv(path, stringsAsFactors = FALSE) %>%
-        janitor::clean_names() %>%
-        mutate(site_name = camera)
-    
-    # Data spoofer - remove when using real dataset
-    if(!"site_name" %in% names(meta)) meta$site_name <- meta$camera
-    if(!"latitude" %in% names(meta)) meta$latitude <- 0.9 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
-    if(!"longitude" %in% names(meta)) meta$longitude <- 34.6 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
-    if(!"image_path" %in% names(meta)) {
-        meta$image_path <- file.path(
-            "camimg",
-            "TimelapseExport",
-            gsub("\\",".", paste0(meta$relative_path,".", meta$file), fixed = TRUE)
-        )
-    }
-    
-    # Date-time parsing
-    if (verbose) message("Parsing date-time values...")
-    if("date_time" %in% names(meta)){
-        meta$date_time <- as.POSIXct(meta$date_time, tz = "UTC",
-                                     tryFormats = c("%Y-%m-%dT%H:%M:%OS",
-                                                    "%Y-%m-%d %H:%M:%OS",
-                                                    "%Y-%m-%d"))
-    } else meta$date_time <- NA
-    
-    # Generate thumbnails
-    if (verbose) message("Generating thumbnails (this may take a while)...")
-    n_images <- nrow(meta)
-    
-    meta$thumb_path <- sapply(seq_len(n_images), function(idx) {
-        img_path <- meta$image_path[idx]
-        full_path <- file.path(image_dir, gsub("camimg/","", img_path))
+    if (file.exists(path)) {
+        meta <- read.csv(path, stringsAsFactors = FALSE) %>%
+            janitor::clean_names() %>%
+            mutate(site_name = camera)
         
-        if (!file.exists(full_path)) return(NA)
-        
-        thumb_file <- file.path(thumb_dir, paste0(basename(img_path)))
-        
-        if (!file.exists(thumb_file)) {
-            if (verbose && idx %% 100 == 0) {
-                message(sprintf("  Processing thumbnail %d of %d (%.1f%%)", 
-                                idx, n_images, (idx/n_images)*100))
-            }
-            try({
-                magick::image_read(full_path) %>%
-                    magick::image_scale(paste0(thumb_width)) %>%
-                    magick::image_write(thumb_file)
-            }, silent = TRUE)
+        # Data spoofer - remove when using real dataset
+        if(!"site_name" %in% names(meta)) meta$site_name <- meta$camera
+        if(!"latitude" %in% names(meta)) meta$latitude <- 0.9 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
+        if(!"longitude" %in% names(meta)) meta$longitude <- 34.6 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
+        if(!"image_path" %in% names(meta)) {
+            meta$image_path <- file.path(
+                "camimg",
+                "TimelapseExport",
+                gsub("\\",".", paste0(meta$relative_path,".", meta$file), fixed = TRUE)
+            )
         }
-        file.path("thumbs", basename(img_path))
-    })
-    
-    if (verbose) message("Data loading complete! Loaded ", nrow(meta), " images from ", 
-                         length(unique(meta$site_name)), " sites.")
-    
-    return(meta)
+        
+        # Date-time parsing
+        if("date_time" %in% names(meta)){
+            meta$date_time <- as.POSIXct(meta$date_time, tz = "UTC",
+                                         tryFormats = c("%Y-%m-%dT%H:%M:%OS",
+                                                        "%Y-%m-%d %H:%M:%OS",
+                                                        "%Y-%m-%d"))
+        } else meta$date_time <- NA
+        
+        # Generate thumbnails
+        meta$thumb_path <- sapply(meta$image_path, function(img_path) {
+            full_path <- file.path(image_dir, gsub("camimg/","",img_path))
+            if (!file.exists(full_path)) return(NA)
+            
+            thumb_file <- file.path(thumb_dir, paste0(basename(img_path)))
+            
+            if (!file.exists(thumb_file)) {
+                try({
+                    magick::image_read(full_path) %>%
+                        magick::image_scale(paste0(thumb_width)) %>%
+                        magick::image_write(thumb_file)
+                }, silent = TRUE)
+            }
+            file.path("thumbs", basename(img_path))
+        })
+        
+        return(meta)
+    }
+    stop("CSV path not found: ",path)
 }
-
-# =============================================================================
-# DATA LOADING - Industry standard: Load data before app initialization
-# =============================================================================
-
-cat("\n")
-cat("================================================================================\n")
-cat("  Guardian Connector: Wildlife Viewer - Data Initialization\n")
-cat("================================================================================\n")
-cat("\n")
-
-# Load and prepare data before app starts
-META_DATA <- tryCatch({
-    load_metadata(
-        path = CONFIG$images$csv_path,
-        image_dir = CONFIG$images$image_dir,
-        thumb_dir = CONFIG$images$thumb_dir,
-        thumb_width = CONFIG$images$thumb_width,
-        verbose = TRUE
-    )
-}, error = function(e) {
-    cat("\n")
-    cat("ERROR: Failed to load data\n")
-    cat("Message: ", e$message, "\n")
-    cat("\n")
-    cat("Please check:\n")
-    cat("  1. CONFIG$data_mount path is correct\n")
-    cat("  2. ImageData.csv exists in that location\n")
-    cat("  3. Image files are accessible\n")
-    cat("\n")
-    stop(e)
-})
-
-cat("\n")
-cat("================================================================================\n")
-cat("  Ready to launch app!\n")
-cat("================================================================================\n")
-cat("\n")
 
 # Filters module  --------------------------------------------------------
 filtersUI <- function(id){
@@ -219,8 +166,7 @@ filtersServer <- function(id, data){
                     min = dmin,
                     max = dmax,
                     value = c(dmin, dmax),
-                    timeFormat = "%d-%b\n%Y", 
-                    width = "90%"
+                    timeFormat = "%d-%b\n%Y", width = "90%"
                 )
             }
         })
@@ -662,13 +608,13 @@ ui <- page_fillable(
     drawerUI("image_drawer"),
     
     layout_sidebar(
-        sidebar = sidebar(
-            padding = 3,
+        sidebar = sidebar(padding = 3,
             width = 370,
             bslib::card(
                 class = "mb-2",
                 mapUI("map_main", height = "200px")
             ),
+            # h5("Filters", class = "mt-2 mb-2"),
             filtersUI("filters")
         ),
         explorerUI("explorer")
@@ -678,8 +624,14 @@ ui <- page_fillable(
 # Server  ----------------------------------------------------------------
 server <- function(input, output, session) {
     
-    # Use pre-loaded data (industry standard approach)
-    r_meta <- reactiveVal(META_DATA)
+    meta <- load_metadata(
+        path = CONFIG$images$csv_path,
+        image_dir = CONFIG$images$image_dir,
+        thumb_dir = CONFIG$images$thumb_dir,
+        thumb_width = CONFIG$images$thumb_width
+    )
+    
+    r_meta <- reactiveVal(meta)
     
     filters_res <- filtersServer("filters", data = reactive(r_meta()))
     
