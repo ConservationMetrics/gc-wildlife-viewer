@@ -58,7 +58,7 @@ load_metadata <- function(csv_path, verbose = TRUE) {
     
     meta <- read.csv(csv_path, stringsAsFactors = FALSE) %>%
         janitor::clean_names() %>%
-        mutate(site_name = camera)
+        mutate(camera=gsub(".*\\\\","",camera),site_name = camera)
     
     # Data spoofer - remove when using real dataset
     if(!"site_name" %in% names(meta)) meta$site_name <- meta$camera
