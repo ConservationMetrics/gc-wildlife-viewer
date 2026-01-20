@@ -1,4 +1,4 @@
-# GC Wildlife Viewer --------
+# Guardian Connector Wildlife Viewer --------
 #
 # Conservation Metrics, Inc 
 # Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet 4.5 to finalize)
@@ -13,8 +13,11 @@
 # TimeLapse.exe, a folder of images exported from TimeLapse.exe, and a folder of
 # image thumbnails generated from the timelapse image export. The dataloader
 # will generate the thumbs if they do not exist.
+#
+# When running locally, data is read from ../data_mount/
+# When running in Docker, set APP_DATA_PATH to the container mount point.
 
-# Install missing packages  ----------------------------------------------
+# INSTALL MISSING PACKAGES --------------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
                        "sf", "leaflet", "magick")
 
@@ -25,6 +28,7 @@ if(length(missing_packages) > 0) {
     install.packages(missing_packages, dependencies = TRUE)
 }
 
+# LOAD PACKAGES ------------------------------------------------------------
 library(shiny)
 library(bslib)
 library(dplyr)
@@ -34,11 +38,10 @@ library(sf)
 library(leaflet)
 library(magick)
 
-# load cuostom functions
+# LOAD CUSTOM FUNCTIONS ----------------------------------------------------
 source("utils.r")
 
-# Config  ---------------------------------------------------------------
-
+# CONFIG -------------------------------------------------------------------
 CONFIG <- list(
     # datalake_mount =  Sys.getenv("DATALAKE_MOUNT"),
     # gc_wildlife_mount = Sys.getenv("GC_WILDLIFE_MOUNT"),
@@ -88,7 +91,7 @@ cat("  Guardian Connector: Wildlife Viewer - Data Initialization\n")
 cat("================================================================================\n")
 cat("\n")
 
-# Load and prepare data before app starts
+# LOAD AND PREPARE DATA BEFORE APP STARTS -----------------------------------
 META_DATA <- tryCatch({
     
     # Step 1: Load metadata
@@ -144,7 +147,7 @@ META_DATA <- tryCatch({
     stop(e)
 })
 
-# Filters module  --------------------------------------------------------
+# FILTERS MODULE -----------------------------------------------------------
 filtersUI <- function(id){
     ns <- NS(id)
     tagList(
@@ -254,7 +257,7 @@ filtersServer <- function(id, data){
     })
 }
 
-# Map module (Leaflet)  --------------------------------------------------
+# MAP MODULE (Leaflet)  ----------------------------------------------------
 mapUI <- function(id, height="200px"){
     ns <- NS(id)
     leafletOutput(ns("map"), height = height)
@@ -346,7 +349,7 @@ mapServer <- function(id, all_sites_df, filtered_sites, selected_site_rv) {
     })
 }
 
-# Explorer module (thumbnails + preview)  --------------------------------
+# EXPLORER MODULE (thumbnails + preview)  ----------------------------------
 explorerUI <- function(id) {
     ns <- NS(id)
     
@@ -448,7 +451,7 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
     })
 }
 
-# Image Drawer Module  ---------------------------------------------------
+# IMAGE DRAWER MODULE ------------------------------------------------------
 drawerUI <- function(id) {
     ns <- NS(id)
     
@@ -605,7 +608,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
     })
 }
 
-# App UI  ----------------------------------------------------------------
+# UI -----------------------------------------------------------------------
 ui <- page_fillable(
     theme = bs_theme(bootswatch = "flatly"),
     
@@ -647,7 +650,7 @@ ui <- page_fillable(
     )
 )
 
-# Server  ----------------------------------------------------------------
+# SERVER -------------------------------------------------------------------
 server <- function(input, output, session) {
     
     # Use pre-loaded data (industry standard approach)
@@ -696,4 +699,5 @@ server <- function(input, output, session) {
     })
 }
 
+# RUN APP ------------------------------------------------------------------
 shinyApp(ui, server)

@@ -1,42 +1,36 @@
-# History files
+# Ignore everything inside data_mount except .gitkeep
+data_mount/*
+!data_mount/.gitkeep
+
+# R session files
 .Rhistory
 .Rapp.history
-
-# Session Data files
 .RData
 .RDataTmp
-
-# User-specific files
 .Ruserdata
-
-# Example code in package build process
-*-Ex.R
-
-# Output files from R CMD build
-/*.tar.gz
-
-# Output files from R CMD check
-/*.Rcheck/
 
 # RStudio files
 .Rproj.user/
 
-# produced vignettes
+# R package build artifacts
+*-Ex.R
+/*.tar.gz
+/*.Rcheck/
+
+# Vignettes
 vignettes/*.html
 vignettes/*.pdf
 
-# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
+# OAuth tokens
 .httr-oauth
 
-# knitr and R markdown default cache directories
+# knitr/R markdown cache
 *_cache/
 /cache/
-
-# Temporary files created by R markdown
 *.utf8.md
 *.knit.md
 
-# R Environment Variables
+# R environment file (may contain secrets)
 .Renviron
 
 # pkgdown site
@@ -45,5 +39,5 @@ docs/
 # translation temp files
 po/*~
 
-# RStudio Connect folder
+# RStudio Connect
 rsconnect/

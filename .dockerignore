@@ -1,0 +1,5 @@
+data_mount/
+.git/
+.gitignore
+.dockerignore
+README.md
