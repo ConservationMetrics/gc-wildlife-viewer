@@ -25,12 +25,12 @@ the `TimelapseExport` subfolder that houses the images inside.   `ImageData.csv`
 (export) should be placed in the `images` folder.  The script is currently
 set up to check for and create a `thumbs` subfolder.
 
-## file storage
+## File Storage
 
 The app relies on the `ImageData.csv` file.  If this file is modified or removed
 the app will crash. To avoid this scenario we set up the app with two volume
 mounts, the `datalake` (where users have access and can rename, delete, etc via
-FileBrowswer) and a `gcwildlife` where only admin have access.  The app will
+FileBrowser) and a `gc-wildlife` where only admin have access.  The app will
 check for the file in the gcwildlife mount and if it doesn't exist it will make
 a copy of the file there, and then read from that location.
 
@@ -45,14 +45,7 @@ TODO: set up with all image data
 
 ### 1. Add runtime libraries to the Dockerfile
 
-Find this section in the Dockerfile:
-```dockerfile
-# Install R packages at build time (not lazily at runtime)
-# Add your packages here. Example:
-# RUN R -e "install.packages(c('dplyr', 'ggplot2'), repos='https://cloud.r-project.org')"
-```
-
-Add any runtime libraries you need to the Dockerfile.
+See [Adding R Packages](#adding-r-packages) below.
 
 ### 2. Build the Docker Image
 
@@ -137,6 +130,16 @@ RUN R -e "install.packages(c('dplyr', 'ggplot2', 'plotly'), repos='https://cloud
 ```
 
 This keeps container startup fast and ensures reproducible builds.
+
+### Troubleshooting
+
+If you encounter errors like:
+
+```
+[INFO] shiny-server - Error getting worker: Error: The application exited during initialization.
+```
+
+That is an indicator that you might be missing an R package. See https://github.com/rstudio/shiny-server/issues/353 for more information on how to debug this by turning on and checking logs.
 
 ## Get building! Your next steps are:
 
