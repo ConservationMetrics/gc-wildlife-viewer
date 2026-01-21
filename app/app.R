@@ -45,8 +45,8 @@ source("utils.r")
 
 # CONFIG -------------------------------------------------------------------
 CONFIG <- list(
-    datalake_mount = file.path(APP_DATA_PATH, "gc-wildlife"),
-    gc_wildlife_mount = file.path(APP_DATA_PATH, "datalake/camera_traps"),
+    datalake_mount = file.path(APP_DATA_PATH, "datalake/camera_traps"),
+    gc_wildlife_mount = file.path(APP_DATA_PATH, "gc-wildlife"),
     
     # For Abram's local development
     # datalake_mount = "D:/CIPDP_camera_trap_exports",
@@ -86,7 +86,7 @@ CONFIG$images$csv_path  <- file.path(CONFIG$gc_wildlife_mount, CONFIG$images$csv
 # On app initialization we make a copy of the csv file and future app launches
 # only recopy if there is no copy at the destination
 if(file.exists(CONFIG$images$csv_path_user) && !file.exists(CONFIG$images$csv_path)){
-    dir.create( dirname(CONFIG$images$csv_path),recursive = T, warn=F)
+    dir.create(dirname(CONFIG$images$csv_path), recursive = TRUE, showWarnings = FALSE)
     file.copy(CONFIG$images$csv_path_user, CONFIG$images$csv_path)
 }
 
