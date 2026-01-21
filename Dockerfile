@@ -8,12 +8,16 @@ RUN apt-get update && apt-get install -y \
     libproj25 \
     libudunits2-0 \
     libmagick++-dev \
+    libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install R packages from binary repository for faster builds
+# Install stringi and sf from source to match system library versions
+RUN R -e "install.packages(c('stringi', 'sf'), repos='https://cloud.r-project.org', type='source', Ncpus=4)"
+
+# Install remaining R packages from binary repository for faster builds
 RUN R -e "options(HTTPUserAgent = sprintf('R/%s R (%s)', getRversion(), paste(getRversion(), R.version['platform'], R.version['arch'], R.version['os']))); \
           pkgs <- c('shiny', 'bslib', 'dplyr', 'lubridate', 'janitor', \
-                    'sf', 'leaflet', 'magick'); \
+                    'leaflet', 'magick'); \
           install.packages(pkgs, repos='https://packagemanager.posit.co/cran/__linux__/jammy/latest', Ncpus=4);"
 
 # Remove default shiny apps
