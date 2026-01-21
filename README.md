@@ -139,7 +139,7 @@ If you encounter errors like:
 [INFO] shiny-server - Error getting worker: Error: The application exited during initialization.
 ```
 
-That is an indicator that you might be missing an R package. See https://github.com/rstudio/shiny-server/issues/353 for more information on how to debug this by turning on and checking logs.
+That is an indicator that you might be missing an R package, or that something in the R code is not working as expected. See https://github.com/rstudio/shiny-server/issues/353 for more information on how to debug this by turning on and checking logs.
 
 ## Get building! Your next steps are:
 
