@@ -22,7 +22,7 @@ APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
 
 # INSTALL MISSING PACKAGES --------------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
-                       "sf", "leaflet", "magick")
+                       "leaflet", "magick")
 
 missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
 
@@ -37,7 +37,6 @@ library(bslib)
 library(dplyr)
 library(lubridate)
 library(janitor)
-library(sf)
 library(leaflet)
 library(magick)
 
