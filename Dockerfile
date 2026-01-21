@@ -7,11 +7,27 @@ RUN apt-get update && apt-get install -y \
     libicu-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install all R packages from source to match system library versions
-# This is slower but ensures compatibility with installed system libraries
-RUN R -e "install.packages(c('shiny', 'bslib', 'dplyr', 'lubridate', 'janitor', \
-                             'leaflet', 'magick'), \
-          repos='https://cloud.r-project.org', type='source', Ncpus=4)"
+# Install packages that need system libraries from source
+# stringi must be compiled from source to match system ICU libraries
+RUN R -e "install.packages('stringi', repos='https://cloud.r-project.org', type='source')"
+
+# magick must be compiled from source to match system ImageMagick libraries  
+RUN R -e "install.packages('magick', repos='https://cloud.r-project.org', type='source')"
+
+# Install packages that depend on stringi from source (janitor and its deps)
+RUN R -e "install.packages(c('snakecase', 'janitor'), repos='https://cloud.r-project.org', type='source', Ncpus=2)"
+
+# Install remaining packages as binaries for speed
+RUN R -e "options(HTTPUserAgent = sprintf('R/%s R (%s)', getRversion(), paste(getRversion(), R.version['platform'], R.version['arch'], R.version['os']))); \
+          pkgs <- c('shiny', 'bslib', 'dplyr', 'lubridate', 'leaflet'); \
+          install.packages(pkgs, repos='https://packagemanager.posit.co/cran/__linux__/jammy/latest', Ncpus=4)"
+
+# Verify all packages are installed and load correctly
+RUN R -e "required <- c('shiny', 'bslib', 'dplyr', 'lubridate', 'janitor', 'leaflet', 'magick'); \
+          installed <- installed.packages()[,'Package']; \
+          missing <- setdiff(required, installed); \
+          if(length(missing) > 0) { stop('Missing packages: ', paste(missing, collapse=', ')) }; \
+          lapply(required, library, character.only=TRUE)"
 
 # Remove default shiny apps
 RUN rm -rf /srv/shiny-server/*
