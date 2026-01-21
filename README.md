@@ -92,7 +92,9 @@ Then open http://localhost:3838
 
 4. If you need password protection, in **HTTP Settings > Edit HTTP Basic Auth** assign a username and password. This approach does not allow multiple different usernames.
 
-5. Under the **Deployment** tab, use "Method 6: Deploy via ImageName"
+5. Set the **Container HTTP Port** to `3838`.
+
+6. Under the **Deployment** tab, use "Method 6: Deploy via ImageName"
 
 
 ## Project Structure
