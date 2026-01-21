@@ -79,6 +79,7 @@ CONFIG$images$csv_path  <- file.path(CONFIG$gc_wildlife_mount, CONFIG$images$csv
 # On app initialization we make a copy of the csv file and future app launches
 # only recopy if there is no copy at the destination
 if(file.exists(CONFIG$images$csv_path_user) && !file.exists(CONFIG$images$csv_path)){
+    dir.create( dirname(CONFIG$images$csv_path),recursive = T, warn=F)
     file.copy(CONFIG$images$csv_path_user, CONFIG$images$csv_path)
 }
 
