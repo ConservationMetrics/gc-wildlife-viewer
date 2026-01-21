@@ -43,7 +43,18 @@ TODO: set up with all image data
 
 ## Quick Start
 
-### 1. Build the Docker Image
+### 1. Add runtime libraries to the Dockerfile
+
+Find this section in the Dockerfile:
+```dockerfile
+# Install R packages at build time (not lazily at runtime)
+# Add your packages here. Example:
+# RUN R -e "install.packages(c('dplyr', 'ggplot2'), repos='https://cloud.r-project.org')"
+```
+
+Add any runtime libraries you need to the Dockerfile.
+
+### 2. Build the Docker Image
 
 The `shiny` user inside the container needs to read files you mount from your host machine. To make this work, build the image with your user's UID/GID:
 
@@ -54,7 +65,7 @@ docker build --build-arg SHINY_UID=$(id -u) --build-arg SHINY_GID=$(id -g) -t my
 If deploying to a server where the data files are owned by a different user, use that user's UID/GID instead.
 If you installed CapRover on a fresh VM, the correct UID and GID to use there are most likely `1000`.
 
-### 2. Run Locally with Docker
+### 3. Run Locally with Docker
 
 ```bash
 docker run -p 3838:3838 -v "$(pwd)/data_mount:/data_mount" my-shiny-app
@@ -64,7 +75,7 @@ Then open http://localhost:3838
 
 **Without Docker (for development):** Open `app/shiny-app.Rproj` in RStudio and click "Run App". The app will read from `data_mount/` in the repo root.
 
-### 3. Deploy to CapRover
+### 4. Deploy to CapRover
 
 1. Push the Docker image to a container registry that's hooked up in your CapRover deployment.
 

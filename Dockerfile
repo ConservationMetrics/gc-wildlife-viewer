@@ -1,8 +1,20 @@
 FROM rocker/shiny:4.5.1
 
 # Install R packages at build time (not lazily at runtime)
-# Add your packages here. Example:
-# RUN R -e "install.packages(c('dplyr', 'ggplot2'), repos='https://cloud.r-project.org')"
+# Runtime libraries for sf (geospatial) and magick (image processing)
+RUN apt-get update && apt-get install -y \
+    libgdal34t64 \
+    libgeos-c1v5 \
+    libproj25 \
+    libudunits2-0 \
+    libmagick++-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install R packages from binary repository for faster builds
+RUN R -e "options(HTTPUserAgent = sprintf('R/%s R (%s)', getRversion(), paste(getRversion(), R.version['platform'], R.version['arch'], R.version['os']))); \
+          pkgs <- c('shiny', 'bslib', 'dplyr', 'lubridate', 'janitor', \
+                    'sf', 'leaflet', 'magick'); \
+          install.packages(pkgs, repos='https://packagemanager.posit.co/cran/__linux__/jammy/latest', Ncpus=4);"
 
 # Remove default shiny apps
 RUN rm -rf /srv/shiny-server/*
