@@ -1,4 +1,4 @@
-# GC Wildlife Viewer --------
+# Guardian Connector Wildlife Viewer --------
 #
 # Conservation Metrics, Inc 
 # Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet 4.5 to finalize)
@@ -13,10 +13,16 @@
 # TimeLapse.exe, a folder of images exported from TimeLapse.exe, and a folder of
 # image thumbnails generated from the timelapse image export. The dataloader
 # will generate the thumbs if they do not exist.
+#
+# When running locally, data is read from ../data_mount/
+# When running in Docker, set APP_DATA_PATH to the container mount point.
 
-# Install missing packages  ----------------------------------------------
+# EXTERNAL DATA PATH -----------------------------------------------------
+APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
+
+# INSTALL MISSING PACKAGES --------------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
-                       "sf", "leaflet", "magick")
+                       "leaflet", "magick")
 
 missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
 
@@ -25,25 +31,26 @@ if(length(missing_packages) > 0) {
     install.packages(missing_packages, dependencies = TRUE)
 }
 
+# LOAD PACKAGES ------------------------------------------------------------
 library(shiny)
 library(bslib)
 library(dplyr)
 library(lubridate)
 library(janitor)
-library(sf)
 library(leaflet)
 library(magick)
 
-# load cuostom functions
+# LOAD CUSTOM FUNCTIONS ----------------------------------------------------
 source("utils.r")
 
-# Config  ---------------------------------------------------------------
-
+# CONFIG -------------------------------------------------------------------
 CONFIG <- list(
-    # datalake_mount =  Sys.getenv("DATALAKE_MOUNT"),
-    # gc_wildlife_mount = Sys.getenv("GC_WILDLIFE_MOUNT"),
-    datalake_mount = "D:/CIPDP_camera_trap_exports",
-    gc_wildlife_mount = "D:/gc_wild",
+    datalake_mount = file.path(APP_DATA_PATH, "datalake/camera_traps"),
+    gc_wildlife_mount = file.path(APP_DATA_PATH, "gc-wildlife"),
+    
+    # For Abram's local development
+    # datalake_mount = "D:/CIPDP_camera_trap_exports",
+    # gc_wildlife_mount = "D:/gc_wild",
     
     images = list(
         image_dir = "TimelapseExport",
@@ -79,7 +86,7 @@ CONFIG$images$csv_path  <- file.path(CONFIG$gc_wildlife_mount, CONFIG$images$csv
 # On app initialization we make a copy of the csv file and future app launches
 # only recopy if there is no copy at the destination
 if(file.exists(CONFIG$images$csv_path_user) && !file.exists(CONFIG$images$csv_path)){
-    dir.create( dirname(CONFIG$images$csv_path),recursive = T, warn=F)
+    dir.create(dirname(CONFIG$images$csv_path), recursive = TRUE, showWarnings = FALSE)
     file.copy(CONFIG$images$csv_path_user, CONFIG$images$csv_path)
 }
 
@@ -89,7 +96,7 @@ cat("  Guardian Connector: Wildlife Viewer - Data Initialization\n")
 cat("================================================================================\n")
 cat("\n")
 
-# Load and prepare data before app starts
+# LOAD AND PREPARE DATA BEFORE APP STARTS -----------------------------------
 META_DATA <- tryCatch({
     
     # Step 1: Load metadata
@@ -145,7 +152,7 @@ META_DATA <- tryCatch({
     stop(e)
 })
 
-# Filters module  --------------------------------------------------------
+# FILTERS MODULE -----------------------------------------------------------
 filtersUI <- function(id){
     ns <- NS(id)
     tagList(
@@ -255,7 +262,7 @@ filtersServer <- function(id, data){
     })
 }
 
-# Map module (Leaflet)  --------------------------------------------------
+# MAP MODULE (Leaflet)  ----------------------------------------------------
 mapUI <- function(id, height="200px"){
     ns <- NS(id)
     leafletOutput(ns("map"), height = height)
@@ -347,7 +354,7 @@ mapServer <- function(id, all_sites_df, filtered_sites, selected_site_rv) {
     })
 }
 
-# Explorer module (thumbnails + preview)  --------------------------------
+# EXPLORER MODULE (thumbnails + preview)  ----------------------------------
 explorerUI <- function(id) {
     ns <- NS(id)
     
@@ -449,7 +456,7 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
     })
 }
 
-# Image Drawer Module  ---------------------------------------------------
+# IMAGE DRAWER MODULE ------------------------------------------------------
 drawerUI <- function(id) {
     ns <- NS(id)
     
@@ -606,7 +613,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
     })
 }
 
-# App UI  ----------------------------------------------------------------
+# UI -----------------------------------------------------------------------
 ui <- page_fillable(
     theme = bs_theme(bootswatch = "flatly"),
     
@@ -648,7 +655,7 @@ ui <- page_fillable(
     )
 )
 
-# Server  ----------------------------------------------------------------
+# SERVER -------------------------------------------------------------------
 server <- function(input, output, session) {
     
     # Use pre-loaded data (industry standard approach)
@@ -697,4 +704,5 @@ server <- function(input, output, session) {
     })
 }
 
+# RUN APP ------------------------------------------------------------------
 shinyApp(ui, server)
