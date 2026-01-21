@@ -59,7 +59,7 @@ Add any runtime libraries you need to the Dockerfile.
 The `shiny` user inside the container needs to read files you mount from your host machine. To make this work, build the image with your user's UID/GID:
 
 ```bash
-docker build --build-arg SHINY_UID=$(id -u) --build-arg SHINY_GID=$(id -g) -t my-shiny-app .
+docker build --build-arg SHINY_UID=$(id -u) --build-arg SHINY_GID=$(id -g) -t guardiancr.azurecr.io/gc-wildlife-viewer:latest .
 ```
 
 If deploying to a server where the data files are owned by a different user, use that user's UID/GID instead.
@@ -68,7 +68,7 @@ If you installed CapRover on a fresh VM, the correct UID and GID to use there ar
 ### 3. Run Locally with Docker
 
 ```bash
-docker run -p 3838:3838 -v "$(pwd)/data_mount:/data_mount" my-shiny-app
+docker run -p 3838:3838 -v "$(pwd)/data_mount:/data_mount" guardiancr.azurecr.io/gc-wildlife-viewer:latest
 ```
 
 Then open http://localhost:3838
