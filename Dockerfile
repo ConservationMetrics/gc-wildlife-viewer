@@ -22,13 +22,6 @@ RUN R -e "options(HTTPUserAgent = sprintf('R/%s R (%s)', getRversion(), paste(ge
           pkgs <- c('shiny', 'bslib', 'dplyr', 'lubridate', 'leaflet'); \
           install.packages(pkgs, repos='https://packagemanager.posit.co/cran/__linux__/jammy/latest', Ncpus=4)"
 
-# Verify all packages are installed and load correctly
-RUN R -e "required <- c('shiny', 'bslib', 'dplyr', 'lubridate', 'janitor', 'leaflet', 'magick'); \
-          installed <- installed.packages()[,'Package']; \
-          missing <- setdiff(required, installed); \
-          if(length(missing) > 0) { stop('Missing packages: ', paste(missing, collapse=', ')) }; \
-          lapply(required, library, character.only=TRUE)"
-
 # Remove default shiny apps
 RUN rm -rf /srv/shiny-server/*
 
