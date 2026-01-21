@@ -17,6 +17,9 @@
 # When running locally, data is read from ../data_mount/
 # When running in Docker, set APP_DATA_PATH to the container mount point.
 
+# EXTERNAL DATA PATH -----------------------------------------------------
+APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
+
 # INSTALL MISSING PACKAGES --------------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
                        "sf", "leaflet", "magick")
@@ -43,10 +46,12 @@ source("utils.r")
 
 # CONFIG -------------------------------------------------------------------
 CONFIG <- list(
-    # datalake_mount =  Sys.getenv("DATALAKE_MOUNT"),
-    # gc_wildlife_mount = Sys.getenv("GC_WILDLIFE_MOUNT"),
-    datalake_mount = "D:/CIPDP_camera_trap_exports",
-    gc_wildlife_mount = "D:/gc_wild",
+    datalake_mount = file.path(APP_DATA_PATH, "gc-wildlife"),
+    gc_wildlife_mount = file.path(APP_DATA_PATH, "datalake/camera_traps"),
+    
+    # For Abram's local development
+    # datalake_mount = "D:/CIPDP_camera_trap_exports",
+    # gc_wildlife_mount = "D:/gc_wild",
     
     images = list(
         image_dir = "TimelapseExport",
