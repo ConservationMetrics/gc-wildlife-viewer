@@ -435,8 +435,12 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
                 tags$div(
                     class = "thumb",
                     onclick = sprintf(
-                        "Shiny.setInputValue('%s', %d, {priority:'event'});",
-                        session$ns("thumb_click"), i
+                        "Shiny.setInputValue('%s', %s, {priority:'event'});",
+                        session$ns("thumb_click"),
+                        jsonlite::toJSON(list(
+                            image_path = row$image_path,
+                            thumb_path = row$thumb_path
+                        ), auto_unbox = TRUE)
                     ),
                     tags$img(src = src, loading = "lazy")
                 )
@@ -445,13 +449,19 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
         
         observeEvent(input$thumb_click, {
             df <- items()
-            i <- as.integer(input$thumb_click)
-            req(i >= 1, i <= nrow(df))
+            payload <- input$thumb_click
+            req(payload$image_path)
             
-            selected_site_rv$site  <- df$site_name[i]
+            row <- df[df$image_path == payload$image_path, , drop = FALSE]
+            req(nrow(row) == 1)
+            
+            selected_site_rv$site   <- row$site_name
             selected_site_rv$source <- "explorer"
             
-            drawer_trigger(list(index = i, data = df[i, , drop = FALSE]))
+            drawer_trigger(list(
+                image_path = payload$image_path,
+                thumb_path = payload$thumb_path
+            ))
         }, ignoreInit = TRUE)
     })
 }
@@ -520,12 +530,16 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
         ns <- session$ns
         
         is_open <- reactiveVal(FALSE)
-        current_index <- reactiveVal(NULL)
+        current_image_path <- reactiveVal(NULL)
+        current_thumb_path <- reactiveVal(NULL)
         
         observeEvent(trigger_data(), {
-            req(trigger_data())
+            req(trigger_data()$image_path)
+            
             is_open(TRUE)
-            current_index(trigger_data()$index)
+            current_image_path(trigger_data()$image_path)
+            current_thumb_path(trigger_data()$thumb_path)
+            
             session$sendCustomMessage("toggleDrawer", list(open = TRUE))
         })
         
@@ -539,9 +553,12 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
             df <- all_data()
             req(df, nrow(df) > 0)
             
-            idx <- current_index()
+            idx <- match(current_image_path(), df$image_path)
+            req(!is.na(idx))
+            
             new_idx <- max(1, idx - 1)
-            if (new_idx != idx) current_index(new_idx)
+            current_image_path(df$image_path[new_idx])
+            current_thumb_path(df$thumb_path[new_idx])
         })
         
         observeEvent(input$next_img, {
@@ -549,18 +566,24 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
             df <- all_data()
             req(df, nrow(df) > 0)
             
-            idx <- current_index()
+            idx <- match(current_image_path(), df$image_path)
+            req(!is.na(idx))
+            
             new_idx <- min(nrow(df), idx + 1)
-            if (new_idx != idx) current_index(new_idx)
+            current_image_path(df$image_path[new_idx])
+            current_thumb_path(df$thumb_path[new_idx])
         })
         
         output$content <- renderUI({
-            req(current_index())
+            req(current_image_path())
             df <- all_data()
-            req(df, nrow(df) > 0)
             
-            idx <- current_index()
-            row <- df[idx, , drop = FALSE]
+            row <- df[df$image_path == current_image_path(), , drop = FALSE]
+            req(nrow(row) == 1)
+            
+            idx <- match(current_image_path(), df$image_path)
+            req(!is.na(idx))
+            
             meta <- as.list(row)
             
             available_primary <- intersect(primary_fields, names(meta))
