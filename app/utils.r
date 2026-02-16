@@ -182,20 +182,46 @@ unflatten_paths <- function(meta, image_dir, verbose = TRUE) {
     # return(meta)
 }
 
-
-# Determine media type from file extension
-get_media_type <- function(filename) {
-    if (is.na(filename) || !nzchar(filename)) return("unknown")
-    ext <- tolower(tools::file_ext(filename))
-    if (ext %in% c("mp4", "mov", "avi", "mkv", "webm")) {
-        return("video")
-    } else if (ext %in% c("jpg", "jpeg", "png", "gif", "bmp")) {
-        return("image")
-    } else {
-        return("unknown")
-    }
-}
-
+#' Determine Media Type from File Extension
+#'
+#' Classifies a file as image, video, or unknown based on its file extension.
+#' This function is useful for camera trap workflows where media files of
+#' different types are stored together and need to be processed differently.
+#'
+#' @param filename Character scalar. The filename or file path to classify.
+#'   Can be a simple filename (e.g., \code{"image.jpg"}) or a full path
+#'   (e.g., \code{"path/to/video.mp4"}). Only the file extension is used
+#'   for classification.
+#'
+#' @return Character scalar. One of:
+#'   \itemize{
+#'     \item \code{"image"}: File has an image extension (jpg, jpeg, png, gif, bmp)
+#'     \item \code{"video"}: File has a video extension (mp4, mov, avi, mkv, webm)
+#'     \item \code{"unknown"}: File has an unrecognized extension, or filename
+#'       is \code{NA} or empty
+#'   }
+#'
+#' @details
+#' The function is case-insensitive and only examines the file extension.
+#' It does not verify that the file actually exists or that its content
+#' matches the extension.
+#'
+#' Recognized extensions:
+#' \itemize{
+#'   \item \strong{Images}: jpg, jpeg, png, gif, bmp
+#'   \item \strong{Videos}: mp4, mov, avi, mkv, webm
+#' }
+#'
+#' @examples
+#' get_media_type("path/to/camera/IMG_0001.JPG")
+#' #> [1] "image"
+#'
+#' get_media_type("clip.MP4")
+#' #> [1] "video"
+#'
+#' @seealso \code{\link{tools::file_ext}}
+#'
+#' @export
 
 #' Check if File is a Video
 #'
