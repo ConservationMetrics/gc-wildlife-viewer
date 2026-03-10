@@ -222,7 +222,17 @@ unflatten_paths <- function(meta, image_dir, verbose = TRUE) {
 #' @seealso \code{\link{tools::file_ext}}
 #'
 #' @export
-
+get_media_type <- function(filename) {
+    if (is.na(filename) || !nzchar(filename)) return("unknown")
+    ext <- tolower(tools::file_ext(filename))
+    if (ext %in% c("mp4", "mov", "avi", "mkv", "webm")) {
+        return("video")
+    } else if (ext %in% c("jpg", "jpeg", "png", "gif", "bmp")) {
+        return("image")
+    } else {
+        return("unknown")
+    }
+}
 #' Check if File is a Video
 #'
 #' Determines whether a file is a video based on its extension.
