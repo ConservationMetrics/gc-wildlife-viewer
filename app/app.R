@@ -133,7 +133,7 @@ META_DATA <- tryCatch({
         verbose = TRUE
     )
     
-    # NEW: Step 4: Set up video thumbnail paths
+    #  Step 4: Set up video thumbnail paths
     cat("\nSTEP 4: Setting up video thumbnail paths...\n")
     
     cat("\n")
