@@ -19,7 +19,7 @@
 # When running in Docker, set APP_DATA_PATH to the container mount point.
 
 # EXTERNAL DATA PATH -----------------------------------------------------
-APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "D:/gc_wild")
+APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
 
 # INSTALL MISSING PACKAGES --------------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
