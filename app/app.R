@@ -59,6 +59,9 @@ CONFIG <- list(
         thumb_width = 300
     ),
     
+    deployment_data=list(
+        deployment_data_path = "D:/gc_wild_mulokot/datalake/camera_traps/Deployment_Info_cameratrap Mulokot - Deployment_Metadata_Raw.csv",
+        rel_path_parts= c("deployment", "region", "camera","location_name")),
     map = list(
         default_zoom = 6
     ),
