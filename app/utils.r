@@ -16,8 +16,9 @@
 #' generated. These are intended for development and demonstration only
 #' and should be removed or replaced when working with real spatial data.
 #'
-#' @param rel_path_parts assumes the relative path captures important information that can be pared into its folder structure.  column names to be created by splitting the relative path on "/". Default = c("deployment", "region", "camera","survey_location")
 #' @param csv_path Character scalar. Path to a metadata CSV file on disk.
+#' @param deployment_data_path Character scalar. Path to a deployment_data CSV file on disk. Must follow the CMI template.
+#' @param rel_path_parts assumes the relative path captures important information that can be pared into its folder structure.  column names to be created by splitting the relative path on "/". Default = c("deployment", "region", "camera","survey_location")
 #' @param verbose 
 #'
 #' @return A data.frame containing the cleaned and augmented metadata.
