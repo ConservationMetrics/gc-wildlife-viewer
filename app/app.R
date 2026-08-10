@@ -171,7 +171,13 @@ filtersUI <- function(id){
                     selected = "all"),
         
         selectInput(ns("field"), "Field", choices = NULL),
-        uiOutput(ns("value_ui")),
+        selectizeInput(
+            ns("values"),
+            "Values",
+            choices = NULL,
+            selected = character(0),
+            multiple = TRUE
+        ),
         uiOutput(ns("date_range_ui")),
         sliderInput(ns("timeofday"), "Time (hr)", min = 0, max = 23, value = c(0,23)),
         actionButton(ns("clear"), "Clear", class = "btn-sm btn-secondary w-100")
@@ -190,10 +196,18 @@ filtersServer <- function(id, data){
             updateSelectInput(session, "site_name", choices = sites, selected = sites)
             
             cols <- names(df)
-            choices <- intersect(c("common_name","local_name","camera","favorite",
-                                   "n_individuals","deployment", "notes"), cols)
-            if(length(choices) == 0) choices <- cols
-            updateSelectInput(session, "field", choices = choices, selected = choices[1])
+            choices <- intersect(c("common_name", "local_name", "camera", "favorite",
+                                   "n_individuals", "deployment", "notes"), cols)
+            if (length(choices) == 0) choices <- cols
+            
+            choices <- c("None" = "", choices)
+            
+            updateSelectInput(
+                session,
+                "field",
+                choices = choices,
+                selected = ""
+            )
         }, ignoreNULL = TRUE)
         
         output$date_range_ui <- renderUI({
@@ -216,18 +230,29 @@ filtersServer <- function(id, data){
             }
         })
         
-        output$value_ui <- renderUI({
-            req(input$field)
+        observeEvent(input$field, {
+            req(input$field != "")
+            
             vals <- unique(data()[[input$field]])
-            selectizeInput(ns("values"), "Values", choices = sort(na.omit(vals)), multiple = TRUE)
-        })
+            
+            updateSelectizeInput(
+                session,
+                "values",
+                choices = sort(na.omit(vals)),
+                selected = character(0)
+            )
+        }, ignoreInit = TRUE)
         
         filtered <- reactive({
             df <- data()
             req(df)
             out <- df
             
-            if(!is.null(input$site_name) && length(input$site_name) > 0){
+            if (
+                !is.null(input$site_name) &&
+                length(input$site_name) > 0 &&
+                length(input$site_name) < length(unique(df$site_name))
+            ) {
                 out <- out[out$site_name %in% input$site_name, , drop = FALSE]
             }
             
@@ -235,7 +260,12 @@ filtersServer <- function(id, data){
                 out <- out[out$media_type == input$media_type, , drop = FALSE]
             }
             
-            if(!is.null(input$field) && !is.null(input$values) && length(input$values) > 0){
+            if (
+                !is.null(input$field) &&
+                nzchar(input$field) &&
+                !is.null(input$values) &&
+                length(input$values) > 0
+            ) {
                 out <- out[out[[input$field]] %in% input$values, , drop = FALSE]
             }
             
@@ -258,7 +288,8 @@ filtersServer <- function(id, data){
             sites <- sort(unique(df$site_name))
             updateSelectInput(session, "site_name", selected = sites)
             updateSelectInput(session, "media_type", selected = "all")  
-            updateSelectizeInput(session, "values", selected = character(0))
+            updateSelectizeInput(session, "values", choices = character(0), selected = character(0) )
+            updateSelectInput(session, "value", selected = character(0))
             if("date_time" %in% names(df)){
                 dmin <- as.Date(min(df$date_time, na.rm = TRUE))
                 dmax <- as.Date(max(df$date_time, na.rm = TRUE))
