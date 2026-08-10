@@ -8,9 +8,6 @@
 # The goal is an intuitive view that could be deployed as part of Guardian 
 # Connector CapRover deployments.
 #
-# 8 Jan 2026 - Original image support
-# 16 Feb 2026 - Added video support
-#
 # This current version of the app requires: a CSV exported from TimeLapse.exe, 
 # a folder of images (and or videos) exported from TimeLapse.exe, a folder 
 # of image and video thumbnails.
