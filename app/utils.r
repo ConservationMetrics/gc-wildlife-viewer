@@ -16,9 +16,9 @@
 #' generated. These are intended for development and demonstration only
 #' and should be removed or replaced when working with real spatial data.
 #'
+#' @param rel_path_parts assumes the relative path captures important information that can be pared into its folder structure.  column names to be created by splitting the relative path on "/". Default = c("deployment", "region", "camera","survey_location")
 #' @param csv_path Character scalar. Path to a metadata CSV file on disk.
-#' @param verbose Logical. If \code{TRUE} (default), progress messages are
-#'   printed to the console.
+#' @param verbose 
 #'
 #' @return A data.frame containing the cleaned and augmented metadata.
 #'   Additional columns include:
@@ -44,11 +44,15 @@
 #' }
 #'
 #' @importFrom stats rnorm
+#' @importFrom tidyr separate_wider_delim
 #' @importFrom utils read.csv
 #' @importFrom janitor clean_names
 #' @export
 
-load_metadata <- function(csv_path, verbose = TRUE) {
+load_metadata <- function(csv_path,
+                          deployment_data_path,
+                          rel_path_parts = c("deployment", "region", "camera","location_name"), 
+                          verbose = TRUE) {
     
     if (!file.exists(csv_path)) {
         stop("Metadata CSV not found: ", csv_path)
@@ -58,13 +62,31 @@ load_metadata <- function(csv_path, verbose = TRUE) {
     
     meta <- read.csv(csv_path, stringsAsFactors = FALSE) %>%
         janitor::clean_names() %>%
-        mutate(camera=gsub(".*\\\\","",camera),site_name = camera)
+        # NOTE: this is custom for Mulokot's data
+        # We need to come up with the supported method for this. 
+        {if(!"camera"%in%names(.)){
+            tidyr::separate_wider_delim(.,cols = relative_path,delim = "\\",names = rel_path_parts,cols_remove =FALSE)}
+        }%>% 
+        mutate(camera=gsub(".*\\\\","",camera),site_name = camera, 
+               location_name =tolower(location_name),
+               datetime=ymd_hms(date_time,tz = "UTC"))
     
-    # Data spoofer - remove when using real dataset
-    if(!"site_name" %in% names(meta)) meta$site_name <- meta$camera
-    if(!"latitude" %in% names(meta)) meta$latitude <- 0.9 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
-    if(!"longitude" %in% names(meta)) meta$longitude <- 34.6 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
-    
+    if(file.exists(deployment_data_path)){
+        deploy<-read.csv(deployment_data_path, stringsAsFactors = FALSE) %>% 
+            janitor::clean_names() %>% 
+            mutate(deployment_datetime=mdy_hms(paste(deployment_date,deployment_time), tz="UTC"),
+                   retrieval_datetime=mdy_hms(paste(retrieval_date,retrieval_time), tz="UTC"),
+                   location_name =tolower(location_name))
+        meta<-meta %>% 
+            left_join(deploy,
+                      by = join_by(location_name, region, camera==camera_name,
+                                   between(datetime,deployment_datetime,retrieval_datetime )))
+                      }else{
+        # Data spoofer - remove when using real dataset
+        if(!"site_name" %in% names(meta)) meta$site_name <- meta$camera
+        if(!"latitude" %in% names(meta)) meta$latitude <- 0.9 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
+        if(!"longitude" %in% names(meta)) meta$longitude <- 34.6 + rnorm(nrow(meta), mean = 0.01, sd = 0.1)
+    }
     # Build flattened path (for TimeLapse exports with backslashes)
     meta$image_path_flat <- file.path(
         gsub("\\", ".", paste0(meta$relative_path, ".", meta$file), fixed = TRUE)

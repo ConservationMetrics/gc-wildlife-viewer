@@ -18,7 +18,7 @@
 # When running in Docker, set APP_DATA_PATH to the container mount point.
 
 # EXTERNAL DATA PATH -----------------------------------------------------
-APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
+APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "D:/gc_wild_mulokot")
 
 # INSTALL MISSING PACKAGES --------------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
@@ -106,6 +106,8 @@ META_DATA <- tryCatch({
     cat("STEP 1: Loading metadata...\n")
     meta <- load_metadata(
         csv_path = CONFIG$images$csv_path,
+        deployment_data_path = CONFIG$deployment_data$deployment_data_path,
+        rel_path_parts = CONFIG$deployment_data$rel_path_parts,
         verbose = TRUE
     )
     
