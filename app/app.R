@@ -18,7 +18,7 @@
 # When running in Docker, set APP_DATA_PATH to the container mount point.
 
 # EXTERNAL DATA PATH -----------------------------------------------------
-APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "D:/gc_wild_mulokot")
+APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
 
 # INSTALL MISSING PACKAGES --------------------------------------------------
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
@@ -60,7 +60,7 @@ CONFIG <- list(
     ),
     
     deployment_data=list(
-        deployment_data_path = "D:/gc_wild_mulokot/datalake/camera_traps/Deployment_Info_cameratrap Mulokot - Deployment_Metadata_Raw.csv",
+        deployment_data_path = "datalake/camera_traps/deployment.csv",
         rel_path_parts= c("deployment", "region", "camera","location_name")),
     map = list(
         default_zoom = 6
