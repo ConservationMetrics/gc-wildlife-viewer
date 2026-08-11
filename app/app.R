@@ -2,7 +2,6 @@
 #
 # Conservation Metrics, Inc 
 # Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet 4.5 to finalize)
-# Modified: Added video support (Feb 2026)
 #
 # This app exposes a map and filters to explore camera trap images and videos. 
 # The goal is an intuitive view that could be deployed as part of Guardian 
