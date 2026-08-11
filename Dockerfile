@@ -3,6 +3,7 @@ FROM rocker/shiny:4.5.1
 # Install R packages at build time (not lazily at runtime)
 # Runtime libraries for magick (image processing)
 RUN apt-get update && apt-get install -y \
+    ffmpeg \
     libmagick++-dev \
     libicu-dev \
     && rm -rf /var/lib/apt/lists/*
