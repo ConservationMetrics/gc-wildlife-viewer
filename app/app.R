@@ -193,9 +193,20 @@ filtersServer <- function(id, data){
             sites <- sort(unique(df$site_name))
             updateSelectInput(session, "site_name", choices = sites, selected = sites)
             
-            cols <- names(df)
-            choices <- intersect(c("common_name", "local_name", "camera", "favorite",
-                                   "n_individuals", "deployment", "notes"), cols)
+            # names from df that are not NA
+            cols <- names(df)[ !sapply(df,function(x)length(unique(x))<=1)]
+            
+            choices <- cols[!(cols%in%c("datetime",
+                                        "deployment_datetime",
+                                        "retrieval_datetime",
+                                        "deployment_date",
+                                        "deployment_time",
+                                        "retrieval_date", 
+                                        "retrieval_time",
+                                        "image_path_flat",
+                                        "image_path",
+                                        "thumb_path"))]
+            
             if (length(choices) == 0) choices <- cols
             
             choices <- c("None" = "", choices)
