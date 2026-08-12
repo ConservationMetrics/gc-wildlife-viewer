@@ -15,13 +15,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # write the package repository into R's site-wide configuration
-# RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest"))' \
-#     >> /usr/local/lib/R/etc/Rprofile.site
+RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest"))' \
+     >> /usr/local/lib/R/etc/Rprofile.site
     
 # Install all R packages as fast binaries using Rocker's native helper
 # See: https://rocker-project.org/use/extending.html#install2.r
 RUN install2.r --error --ncpus 4 \
-    --repos "https://packagemanager.posit.co/cran/__linux__/noble/latest") \
     terra \
     stringi \
     magick \
