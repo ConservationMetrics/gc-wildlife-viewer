@@ -18,6 +18,7 @@
 APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
 
 # INSTALL MISSING PACKAGES --------------------------------------------------
+# TODO: Romove from script so that app fails if a package was not installed in docker
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
                        "leaflet", "magick")
 
