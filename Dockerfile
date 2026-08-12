@@ -1,29 +1,28 @@
-FROM rocker/shiny:4.5.1
+FROM rocker/shiny:4.6.0
 
-# Install R packages at build time (not lazily at runtime)
-# Runtime libraries for magick (image processing)
-RUN apt-get update && apt-get install -y \
+# Install all system libraries needed for magick, stringi, and terra
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libmagick++-dev \
-    libicu-dev \
+    libuv1-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install packages that need system libraries from source
-# stringi must be compiled from source to match system ICU libraries
-RUN R -e "install.packages('stringi', repos='https://cloud.r-project.org', type='source')"
-
-# magick must be compiled from source to match system ImageMagick libraries  
-RUN R -e "install.packages('magick', repos='https://cloud.r-project.org', type='source')"
-
-# Install packages that depend on stringi from source (janitor and its deps)
-RUN R -e "install.packages(c('snakecase', 'janitor'), repos='https://cloud.r-project.org', type='source', Ncpus=2)"
-
-# Install remaining packages as binaries for speed.
-# rocker/shiny:4.5.1 is Ubuntu noble — jammy binaries will not install reliably.
-RUN R -e "options(HTTPUserAgent = sprintf('R/%s R (%s)', getRversion(), paste(getRversion(), R.version['platform'], R.version['arch'], R.version['os']))); \
-          pkgs <- c('shiny', 'bslib', 'dplyr', 'lubridate', 'leaflet'); \
-          install.packages(pkgs, repos='https://packagemanager.posit.co/cran/__linux__/noble/latest', Ncpus=4); \
-          stopifnot(all(pkgs %in% rownames(installed.packages())))"
+# write the package repository into R's site-wide configuration
+RUN echo 'options(repos = c(CRAN = "https://packagemanager.posit.co/cran/__linux__/noble/latest"))' \
+     >> /usr/local/lib/R/etc/Rprofile.site
+    
+# Install all R packages as fast binaries using Rocker's native helper
+# See: https://rocker-project.org/use/extending.html#install2.r
+RUN install2.r --error --ncpus 4 \
+    terra \
+    stringi \
+    magick \
+    snakecase \
+    janitor \
+    bslib \
+    dplyr \
+    lubridate \
+    leaflet
 
 # Remove default shiny apps
 RUN rm -rf /srv/shiny-server/*

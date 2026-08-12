@@ -1,5 +1,10 @@
+app/tests/
+app/.Rproj.user/
+app/.Renviron
 data_mount/
+README.md
 .git/
 .gitignore
 .dockerignore
-README.md
+.Rproj.user/
+.vscode/
