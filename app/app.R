@@ -57,6 +57,14 @@ CONFIG <- list(
         thumb_width = 300
     ),
     
+    deployment_data=list(
+        # TODO: these might make sense to be ENV vars
+        deployment_data_path = file.path(APP_DATA_PATH, "datalake/camera_traps/deployment.csv"),
+        # these are the column names into which we will split the
+        # "relative_path" column from the timelapse export ImageData.csv.  Thety
+        # are then used to join with the deployment.csv
+        rel_path_parts= c("deployment", "region", "camera","location_name")),
+    
     map = list(
         default_zoom = 6
     ),
@@ -102,6 +110,8 @@ META_DATA <- tryCatch({
     cat("STEP 1: Loading metadata...\n")
     meta <- load_metadata(
         csv_path = CONFIG$images$csv_path,
+        deployment_data_path = CONFIG$deployment_data$deployment_data_path,
+        rel_path_parts = CONFIG$deployment_data$rel_path_parts,
         verbose = TRUE
     )
     
