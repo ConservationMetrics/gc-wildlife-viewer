@@ -33,9 +33,6 @@ vignettes/*.pdf
 # R environment file (may contain secrets)
 .Renviron
 
-# pkgdown site
-docs/
-
 # translation temp files
 po/*~
 

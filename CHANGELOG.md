@@ -1,3 +1,8 @@
+# 2026-08-12 - Add else condition to pipe if camera field exists; add guards for mutating fields- #28
+
+* add else condition to pipe if there is a `camera` field field in the `ImageData.csv` file. Also, before mutating the fields, check that the field exists in the data and that it is not empty.
+
+
 # 2026-08-11 - Allow site_name for mapping to be set per deployment PR #27
 
 * adds a configurable argument to the config that lets the user set the column names from which we build the site_name which is used in mapping to determine unique sites/points.
