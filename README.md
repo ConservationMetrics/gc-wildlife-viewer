@@ -36,13 +36,13 @@ The deployment data is a CSV that must contain the following columns:
 - `region`: Region (join key with metadata)
 - `camera_name`: Camera name (joined to metadata `camera`)
 - `deployment_date`: Deployment date (`mdy` format; combined with `deployment_time`)
-- `deployment_time`: Deployment time (combined with `deployment_date` into `deployment_datetime` UTC)
+- `deployment_time`: Deployment time (HH:MM:SS format; combined with `deployment_date` into `deployment_datetime` UTC)
 - `retrieval_date`: Retrieval date (`mdy` format; combined with `retrieval_time`)
-- `retrieval_time`: Retrieval time (combined with `retrieval_date` into `retrieval_datetime` UTC)
-- `latitude`: Latitude of the location (joined onto metadata for the map)
-- `longitude`: Longitude of the location (joined onto metadata for the map)
+- `retrieval_time`: Retrieval time (HH:MM:SS format; combined with `retrieval_date` into `retrieval_datetime` UTC)
+- `latitude`: Latitude of the location (units: decimal degrees; joined onto metadata for the map)
+- `longitude`: Longitude of the location (units: decimal degrees; joined onto metadata for the map)
 
-Rows are joined to metadata on `location_name`, `region`, and `camera`/`camera_name`, with the image `datetime` falling between `deployment_datetime` and `retrieval_datetime`.
+Rows are joined to metadata on `location_name`, `region`, and `camera`/`camera_name`, with the media `datetime` falling between `deployment_datetime` and `retrieval_datetime`.
 
 > [!NOTE]
 >
