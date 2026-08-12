@@ -3,16 +3,13 @@
 # Conservation Metrics, Inc 
 # Author: Abram B. Fleishman and ChatGPT 5 (with Claude Sonnet 4.5 to finalize)
 #
-# This app exposes a map and filters to explore camera trap images. The goal is
-# an intuitive view that could be deployed as part of Guardian Connector CapRover
-# deployments.
+# This app exposes a map and filters to explore camera trap images and videos. 
+# The goal is an intuitive view that could be deployed as part of Guardian 
+# Connector CapRover deployments.
 #
-# 8 Jan 2026
-#
-# This current version of the app requires 3 data sources: a CSV exported from
-# TimeLapse.exe, a folder of images exported from TimeLapse.exe, and a folder of
-# image thumbnails generated from the timelapse image export. The dataloader
-# will generate the thumbs if they do not exist.
+# This current version of the app requires: a CSV exported from TimeLapse.exe, 
+# a folder of images (and or videos) exported from TimeLapse.exe, a folder 
+# of image and video thumbnails.
 #
 # When running locally, data is read from ../data_mount/
 # When running in Docker, set APP_DATA_PATH to the container mount point.
@@ -21,6 +18,7 @@
 APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
 
 # INSTALL MISSING PACKAGES --------------------------------------------------
+# TODO: Romove from script so that app fails if a package was not installed in docker
 required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
                        "leaflet", "magick")
 
@@ -70,7 +68,8 @@ CONFIG <- list(
             "date_time",
             "local_name",
             "common_name",
-            "n_individuals"
+            "n_individuals",
+            "media_type"  
         )
     )
 )
@@ -106,6 +105,12 @@ META_DATA <- tryCatch({
         verbose = TRUE
     )
     
+    # NEW: Add media type detection
+    cat("\nSTEP 1b: Detecting media types...\n")
+    meta$media_type <- sapply(meta$file, get_media_type)
+    message("  Found ", sum(meta$media_type == "image", na.rm = TRUE), " images")
+    message("  Found ", sum(meta$media_type == "video", na.rm = TRUE), " videos")
+    
     # Step 2: Unflatten folder structure if needed
     cat("\nSTEP 2: Checking folder structure...\n")
     if (!all(file.exists(file.path(CONFIG$images$image_dir, meta$image_path)))) {
@@ -118,8 +123,8 @@ META_DATA <- tryCatch({
         message("Folder structure already correct, skipping unflatten step.")
     }
     
-    # Step 3: Generate thumbnails
-    cat("\nSTEP 3: Generating thumbnails...\n")
+    # Step 3: Generate thumbnails for images
+    cat("\nSTEP 3: Generating thumbnails for images...\n")
     generate_thumbnails(
         meta = meta,
         image_dir = CONFIG$images$image_dir,
@@ -127,6 +132,9 @@ META_DATA <- tryCatch({
         thumb_width = CONFIG$images$thumb_width,
         verbose = TRUE
     )
+    
+    #  Step 4: Set up video thumbnail paths
+    cat("\nSTEP 4: Setting up video thumbnail paths...\n")
     
     cat("\n")
     cat("================================================================================\n")
@@ -157,8 +165,19 @@ filtersUI <- function(id){
     ns <- NS(id)
     tagList(
         selectInput(ns("site_name"), "Site", choices = NULL, multiple = TRUE),
+        
+        selectInput(ns("media_type"), "Media Type", 
+                    choices = c("All" = "all", "Images" = "image", "Videos" = "video"),
+                    selected = "all"),
+        
         selectInput(ns("field"), "Field", choices = NULL),
-        uiOutput(ns("value_ui")),
+        selectizeInput(
+            ns("values"),
+            "Values",
+            choices = NULL,
+            selected = character(0),
+            multiple = TRUE
+        ),
         uiOutput(ns("date_range_ui")),
         sliderInput(ns("timeofday"), "Time (hr)", min = 0, max = 23, value = c(0,23)),
         actionButton(ns("clear"), "Clear", class = "btn-sm btn-secondary w-100")
@@ -177,10 +196,18 @@ filtersServer <- function(id, data){
             updateSelectInput(session, "site_name", choices = sites, selected = sites)
             
             cols <- names(df)
-            choices <- intersect(c("common_name","local_name","camera","favorite",
-                                   "n_individuals","deployment", "notes"), cols)
-            if(length(choices) == 0) choices <- cols
-            updateSelectInput(session, "field", choices = choices, selected = choices[1])
+            choices <- intersect(c("common_name", "local_name", "camera", "favorite",
+                                   "n_individuals", "deployment", "notes"), cols)
+            if (length(choices) == 0) choices <- cols
+            
+            choices <- c("None" = "", choices)
+            
+            updateSelectInput(
+                session,
+                "field",
+                choices = choices,
+                selected = ""
+            )
         }, ignoreNULL = TRUE)
         
         output$date_range_ui <- renderUI({
@@ -203,22 +230,42 @@ filtersServer <- function(id, data){
             }
         })
         
-        output$value_ui <- renderUI({
-            req(input$field)
+        observeEvent(input$field, {
+            req(input$field != "")
+            
             vals <- unique(data()[[input$field]])
-            selectizeInput(ns("values"), "Values", choices = sort(na.omit(vals)), multiple = TRUE)
-        })
+            
+            updateSelectizeInput(
+                session,
+                "values",
+                choices = sort(na.omit(vals)),
+                selected = character(0)
+            )
+        }, ignoreInit = TRUE)
         
         filtered <- reactive({
             df <- data()
             req(df)
             out <- df
             
-            if(!is.null(input$site_name) && length(input$site_name) > 0){
+            if (
+                !is.null(input$site_name) &&
+                length(input$site_name) > 0 &&
+                length(input$site_name) < length(unique(df$site_name))
+            ) {
                 out <- out[out$site_name %in% input$site_name, , drop = FALSE]
             }
             
-            if(!is.null(input$field) && !is.null(input$values) && length(input$values) > 0){
+            if(!is.null(input$media_type) && input$media_type != "all"){
+                out <- out[out$media_type == input$media_type, , drop = FALSE]
+            }
+            
+            if (
+                !is.null(input$field) &&
+                nzchar(input$field) &&
+                !is.null(input$values) &&
+                length(input$values) > 0
+            ) {
                 out <- out[out[[input$field]] %in% input$values, , drop = FALSE]
             }
             
@@ -240,7 +287,9 @@ filtersServer <- function(id, data){
             df <- data()
             sites <- sort(unique(df$site_name))
             updateSelectInput(session, "site_name", selected = sites)
-            updateSelectizeInput(session, "values", selected = character(0))
+            updateSelectInput(session, "media_type", selected = "all")  
+            updateSelectizeInput(session, "values", choices = character(0), selected = character(0) )
+            updateSelectInput(session, "value", selected = character(0))
             if("date_time" %in% names(df)){
                 dmin <- as.Date(min(df$date_time, na.rm = TRUE))
                 dmax <- as.Date(max(df$date_time, na.rm = TRUE))
@@ -249,8 +298,9 @@ filtersServer <- function(id, data){
             updateSliderInput(session, "timeofday", value = c(0,23))
         })
         
-        set_filter <- function(site_name = NULL, field = NULL, values = NULL, date_range = NULL, timeofday = NULL){
+        set_filter <- function(site_name = NULL, field = NULL, values = NULL, date_range = NULL, timeofday = NULL, media_type = NULL){
             if(!is.null(site_name)) updateSelectInput(session, "site_name", selected = site_name)
+            if(!is.null(media_type)) updateSelectInput(session, "media_type", selected = media_type) 
             if(!is.null(field)) updateSelectInput(session, "field", selected = field)
             if(!is.null(values)) updateSelectizeInput(session, "values", selected = values)
             if(!is.null(date_range) && length(date_range) == 2) updateSliderInput(session, "date_range", value = as.Date(date_range))
@@ -358,12 +408,14 @@ mapServer <- function(id, all_sites_df, filtered_sites, selected_site_rv) {
 explorerUI <- function(id) {
     ns <- NS(id)
     
-    # Minimal CSS for grid layout and native aspect ratio
     gallery_css <- sprintf("
         #%s { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 8px; }
         .thumb { width: 100%%; border-radius: 6px; background: #f0f0f0; cursor: pointer; 
-                 display: flex; align-items: center; justify-content: center; }
+                 display: flex; align-items: center; justify-content: center; position: relative; }
         .thumb img { width: 100%%; height: auto; display: block; }
+        .badge-video { position: absolute; top: 8px; right: 8px; background-color: #ff4444; 
+                      color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; 
+                      font-weight: bold; z-index: 10; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
     ", ns("gallery"))
     
     tagList(
@@ -384,7 +436,7 @@ explorerUI <- function(id) {
         bslib::card(
             full_screen = TRUE,
             max_height = "calc(100vh - 100px)",
-            card_header("Images"),
+            card_header("Images & Videos"),  
             bslib::card_body(
                 id = ns("scroll"),
                 style = "overflow-y: auto;",
@@ -425,11 +477,23 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
             lapply(seq_len(nrow(df)), function(i) {
                 row <- df[i, , drop = FALSE]
                 
-                # Use thumbnail if available, otherwise use full image
-                src <- if (!is.na(row$thumb_path) && nzchar(row$thumb_path)) {
-                    file.path("thumbs", row$thumb_path)
+                if (row$media_type == "video") {
+                    # Use video thumbnail
+                    src <- if (!is.na(row$thumb_path) && nzchar(row$thumb_path)) {
+                        file.path("thumbs", row$thumb_path)
+                    } else {
+                        # Fallback to a placeholder or first frame
+                        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='200'%3E%3Crect width='300' height='200' fill='%23333'/%3E%3Ctext x='50%25' y='50%25' fill='white' text-anchor='middle'%3EVIDEO%3C/text%3E%3C/svg%3E"
+                    }
+                    badge <- tags$span(class = "badge-video", "VIDEO")
                 } else {
-                    file.path("camimg", row$image_path)
+                    # Use image thumbnail
+                    src <- if (!is.na(row$thumb_path) && nzchar(row$thumb_path)) {
+                        file.path("thumbs", row$thumb_path)
+                    } else {
+                        file.path("camimg", row$image_path)
+                    }
+                    badge <- NULL
                 }
                 
                 tags$div(
@@ -439,10 +503,13 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
                         session$ns("thumb_click"),
                         jsonlite::toJSON(list(
                             image_path = row$image_path,
-                            thumb_path = row$thumb_path
+                            thumb_path = row$thumb_path,
+                            media_type = row$media_type,  
+                            thumb_path = row$thumb_path  
                         ), auto_unbox = TRUE)
                     ),
-                    tags$img(src = src, loading = "lazy")
+                    tags$img(src = src, loading = "lazy"),
+                    badge  
                 )
             })
         })
@@ -460,7 +527,9 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
             
             drawer_trigger(list(
                 image_path = payload$image_path,
-                thumb_path = payload$thumb_path
+                thumb_path = payload$thumb_path,
+                media_type = payload$media_type,  
+                thumb_path = payload$thumb_path  
             ))
         }, ignoreInit = TRUE)
     })
@@ -470,7 +539,6 @@ explorerServer <- function(id, data, selected_site_rv, drawer_trigger, batch_siz
 drawerUI <- function(id) {
     ns <- NS(id)
     
-    # Minimal CSS for drawer positioning and animation
     drawer_css <- "
         .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); 
                           z-index: 9998; display: none; }
@@ -480,6 +548,7 @@ drawerUI <- function(id) {
                   transition: right 0.3s ease-in-out; overflow-y: auto; }
         .drawer.open { right: 0; }
         .drawer-image { width: 100%; border-radius: 8px; margin-bottom: 16px; }
+        .drawer-video { width: 100%; border-radius: 8px; margin-bottom: 16px; max-height: 70vh; }
     "
     
     # Keyboard navigation script
@@ -515,7 +584,7 @@ drawerUI <- function(id) {
             id = ns("drawer"),
             div(
                 class = "d-flex justify-content-between align-items-center p-3 border-bottom bg-light",
-                tags$h5("Image Details", class = "mb-0"),
+                tags$h5("Media Details", class = "mb-0"),  
                 actionButton(ns("close_btn"), "×", 
                              class = "btn-close", 
                              onclick = sprintf("Shiny.setInputValue('%s', true, {priority: 'event'});", ns("close")))
@@ -532,6 +601,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
         is_open <- reactiveVal(FALSE)
         current_image_path <- reactiveVal(NULL)
         current_thumb_path <- reactiveVal(NULL)
+        current_media_type <- reactiveVal(NULL)  
         
         observeEvent(trigger_data(), {
             req(trigger_data()$image_path)
@@ -539,6 +609,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
             is_open(TRUE)
             current_image_path(trigger_data()$image_path)
             current_thumb_path(trigger_data()$thumb_path)
+            current_media_type(trigger_data()$media_type) 
             
             session$sendCustomMessage("toggleDrawer", list(open = TRUE))
         })
@@ -559,6 +630,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
             new_idx <- max(1, idx - 1)
             current_image_path(df$image_path[new_idx])
             current_thumb_path(df$thumb_path[new_idx])
+            current_media_type(df$media_type[new_idx])  
         })
         
         observeEvent(input$next_img, {
@@ -572,6 +644,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
             new_idx <- min(nrow(df), idx + 1)
             current_image_path(df$image_path[new_idx])
             current_thumb_path(df$thumb_path[new_idx])
+            current_media_type(df$media_type[new_idx])  
         })
         
         output$content <- renderUI({
@@ -601,11 +674,31 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
                 )
             }
             
+            # Create appropriate media display (image or video)
+            media_display <- if (row$media_type == "video") {
+                # VIDEO PLAYER
+                video_src <- file.path("camimg", row$image_path)  # Note: assuming video files are in image_path column
+                tags$video(
+                    src = video_src,
+                    controls = "controls",
+                    class = "drawer-video",
+                    preload = "metadata",
+                    tags$p("Your browser does not support the video tag.")
+                )
+            } else {
+                # IMAGE DISPLAY
+                if (!is.na(row$image_path)) {
+                    tags$img(src = file.path("camimg", row$image_path), class = "drawer-image")
+                } else {
+                    NULL
+                }
+            }
+            
             tagList(
                 div(
                     class = "mb-3",
                     div(class = "text-muted small mb-2",
-                        sprintf("Image %d of %d", idx, nrow(df))
+                        sprintf("Media %d of %d", idx, nrow(df)) 
                     ),
                     lapply(available_primary, function(field) {
                         tags$span(
@@ -618,9 +711,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
                     })
                 ),
                 
-                if (!is.na(row$image_path)) {
-                    tags$img(src = file.path("camimg", row$image_path), class = "drawer-image")
-                },
+                media_display,  
                 
                 bslib::accordion(
                     id = ns("details_accordion"),
