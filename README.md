@@ -184,11 +184,11 @@ If you encounter this error message on startup:
 [INFO] shiny-server - Error getting worker: Error: The application exited during initialization.
 ```
 
-That is an indicator that you might be missing an R package, or that something in the R code is not working as expected. 
+That is an indicator that you might be missing an R package, or that something in the R code is not working as expected. The following steps will help you troubleshoot the issue:
 
--Turn on logging by uncommenting `preserve_logs true;` in `shiny-server.conf`
-- Find the container ID using `docker ps`
-- Open a shell to the container using `docker exec -it <container_id> /bin/bash`
-- Check the logs on the container in `/var/log/shiny-server/` for more information.
+1. Turn on logging by uncommenting `preserve_logs true;` in `shiny-server.conf`
+2. Find the container ID using `docker ps`
+3. Open a shell to the container using `docker exec -it <container_id> /bin/bash`
+4. Check the logs on the container in `/var/log/shiny-server/` for more information.
 
 See https://github.com/rstudio/shiny-server/issues/353 for more information.
