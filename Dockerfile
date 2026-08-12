@@ -3,15 +3,6 @@ FROM rocker/shiny:4.6.0
 # Install all system libraries needed for magick, stringi, and terra
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    libmagick++-dev \
-    libicu-dev \
-    libuv1-dev \
-    libgdal-dev \
-    libgeos-dev \
-    libproj-dev \
-    libtbb-dev \
-    libnetcdf-dev \
-    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 # write the package repository into R's site-wide configuration
