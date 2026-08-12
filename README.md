@@ -60,16 +60,11 @@ The easiest way to get the data into the `camera_traps` folder is to use the [Fi
 
 > [!IMPORTANT]
 >
-> The app **relies** on the `ImageData.csv` file.  If this file is modified or removed
-the app will crash. 
+> The app **relies** on the `ImageData.csv` file.  If this file is modified or removed the app will crash. 
 >
-> To avoid this scenario, we set up the app with two volume
-mounts, the `datalake` (where users have access and can rename, delete, etc via
-FileBrowser) and a `gc-wildlife` where only admin have access.  
+> To avoid this scenario, we set up the app with two volume mounts, the `datalake` (where users have access and can rename, delete, etc via FileBrowser) and a `gc-wildlife` where only admin have access.  
 >
-> The app will
-check for the file in the `gc-wildlife` mount and if it doesn't exist it will make
-a copy of the file there, and then read from that location.
+> The app will check for the file in the `gc-wildlife` mount and if it doesn't exist it will make a copy of the file there, and then read from that location.
 
 ### Not yet supported
 
