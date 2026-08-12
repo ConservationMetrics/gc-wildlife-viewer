@@ -194,7 +194,7 @@ filtersServer <- function(id, data){
             req(df)
             
             sites <- sort(unique(df$site_name))
-            updateSelectInput(session, "site_name", choices = sites, selected = sites)
+            updateSelectInput(session, "site_name", choices = sites, selected = character(0))
             
             cols <- names(df)
             choices <- intersect(c("common_name", "local_name", "camera", "favorite",
