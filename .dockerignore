@@ -7,3 +7,4 @@ app/tests/
 app/.Rproj.user/
 .Rproj.user/
 .vscode/
+app/.Renviron
