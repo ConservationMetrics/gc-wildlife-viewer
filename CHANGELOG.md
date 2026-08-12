@@ -1,3 +1,7 @@
+# Read CSV as UTF-8- #29
+
+* introduces a fix to read the CSV as UTF-8 for cases when the CSV is Windows-1252 encoded, and some bytes are invalid UTF-8, which shows up as � and can crash the select input.
+
 # 2026-08-12 - Add else condition to pipe if camera field exists; add guards for mutating fields- #28
 
 * add else condition to pipe if there is a `camera` field field in the `ImageData.csv` file. Also, before mutating the fields, check that the field exists in the data and that it is not empty.

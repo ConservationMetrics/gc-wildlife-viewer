@@ -56,6 +56,63 @@
 #' @importFrom janitor clean_names
 #' @export
 
+#' Read a CSV as UTF-8, tolerating TimeLapse/Windows encodings
+#'
+#' TimeLapse exports on Western Windows are often Windows-1252. Reading those
+#' as UTF-8 leaves invalid byte sequences that break Shiny/`jsonlite` (and
+#' show up as \code{�}). Characters like \code{ë} are fine once decoded to UTF-8.
+#'
+#' For future reference, a different approach to use `readr` R package is documented here: https://github.com/ConservationMetrics/gc-wildlife-viewer/pull/29#pullrequestreview-4920922074
+#' @param path Character scalar. Path to a CSV file.
+#' @param verbose Logical. If \code{TRUE}, report the encoding used.
+#' @return A data.frame with character columns marked UTF-8.
+#' @keywords internal
+read_csv_utf8 <- function(path, verbose = FALSE) {
+    raw <- readBin(path, what = "raw", n = file.info(path)$size)
+
+    detected <- tryCatch({
+        hits <- stringi::stri_enc_detect(raw)[[1]]
+        hits$Encoding[hits$Confidence >= 0.2]
+    }, error = function(e) character())
+
+    # UTF-8 first; Windows-1252 next (TimeLapse/Excel on Western Windows)
+    candidates <- unique(c("UTF-8", "UTF-8-BOM", detected, "windows-1252", "ISO-8859-1"))
+
+    for (enc in candidates) {
+        if (enc %in% c("UTF-8", "UTF-8-BOM") && !isTRUE(stringi::stri_enc_isutf8(raw))) {
+            next
+        }
+
+        text <- tryCatch(
+            stringi::stri_encode(raw, from = enc, to = "UTF-8"),
+            error = function(e) NULL
+        )
+        if (is.null(text) || !nzchar(text)) next
+
+        df <- tryCatch(
+            utils::read.csv(
+                textConnection(text, encoding = "UTF-8"),
+                stringsAsFactors = FALSE,
+                check.names = FALSE
+            ),
+            error = function(e) NULL
+        )
+        if (is.null(df) || ncol(df) < 1) next
+
+        chr <- vapply(df, is.character, logical(1))
+        df[chr] <- lapply(df[chr], function(col) {
+            col <- stringi::stri_enc_toutf8(col, validate = TRUE)
+            Encoding(col) <- "UTF-8"
+            col
+        })
+
+        if (verbose) message("  Decoded ", basename(path), " as ", enc)
+        return(df)
+    }
+
+    stop("Could not decode CSV as UTF-8 (tried: ", paste(candidates, collapse = ", "), "): ", path)
+}
+
 load_metadata <- function(csv_path,
                           deployment_data_path,
                           rel_path_parts = c("deployment", "region", "camera","location_name"), 
@@ -68,7 +125,7 @@ load_metadata <- function(csv_path,
     
     if (verbose) message("Loading metadata from: ", csv_path)
     
-    meta <- read.csv(csv_path, stringsAsFactors = FALSE) %>%
+    meta <- read_csv_utf8(csv_path, verbose = verbose) %>%
         janitor::clean_names() %>%
         # NOTE: this is custom for a specific user's data
         # We need to come up with the supported method for this.
