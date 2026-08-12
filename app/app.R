@@ -17,18 +17,6 @@
 # EXTERNAL DATA PATH -----------------------------------------------------
 APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
 
-# INSTALL MISSING PACKAGES --------------------------------------------------
-# TODO: Romove from script so that app fails if a package was not installed in docker
-required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
-                       "leaflet", "magick")
-
-missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
-
-if(length(missing_packages) > 0) {
-    message("Installing missing packages: ", paste(missing_packages, collapse = ", "))
-    install.packages(missing_packages, dependencies = TRUE)
-}
-
 # LOAD PACKAGES ------------------------------------------------------------
 library(shiny)
 library(bslib)
@@ -59,7 +47,7 @@ CONFIG <- list(
     
     deployment_data=list(
         # TODO: these might make sense to be ENV vars
-        deployment_data_path = "datalake/camera_traps/deployment.csv",
+        deployment_data_path = file.path(APP_DATA_PATH, "datalake/camera_traps/deployment.csv"),
         # these are the column names into which we will split the
         # "relative_path" column from the timelapse export ImageData.csv.  Thety
         # are then used to join with the deployment.csv
