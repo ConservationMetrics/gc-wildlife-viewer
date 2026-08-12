@@ -1,3 +1,7 @@
+# 2026-08-11 - Added deployment data support
+
+* this release adds support for deployment data. The app now reads a deployment CSV file and uses the lat/lon values to display the deployment on the map.
+
 # 2026-02-16 - Added video support
 
 * this release provides support for video. This was implimented by:
