@@ -49,9 +49,11 @@ CONFIG <- list(
         # TODO: these might make sense to be ENV vars
         deployment_data_path = file.path(APP_DATA_PATH, "datalake/camera_traps/deployment.csv"),
         # these are the column names into which we will split the
-        # "relative_path" column from the timelapse export ImageData.csv.  Thety
+        # "relative_path" column from the timelapse export ImageData.csv.  They
         # are then used to join with the deployment.csv
-        rel_path_parts= c("deployment", "region", "camera","location_name")),
+        rel_path_parts= c("deployment", "region", "camera","location_name"),
+        site_name_cols = c("location_name", "camera_name", "region")
+    ),
     
     map = list(
         default_zoom = 6
@@ -100,6 +102,7 @@ META_DATA <- tryCatch({
         csv_path = CONFIG$images$csv_path,
         deployment_data_path = CONFIG$deployment_data$deployment_data_path,
         rel_path_parts = CONFIG$deployment_data$rel_path_parts,
+        site_name_cols = CONFIG$deployment_data$site_name_cols,
         verbose = TRUE
     )
     
@@ -191,7 +194,7 @@ filtersServer <- function(id, data){
             req(df)
             
             sites <- sort(unique(df$site_name))
-            updateSelectInput(session, "site_name", choices = sites, selected = sites)
+            updateSelectInput(session, "site_name", choices = sites, selected = character(0))
             
             # names from df that are not NA
             cols <- names(df)[ !sapply(df,function(x)length(unique(x))<=1)]
@@ -295,10 +298,10 @@ filtersServer <- function(id, data){
         observeEvent(input$clear, {
             df <- data()
             sites <- sort(unique(df$site_name))
-            updateSelectInput(session, "site_name", selected = sites)
+            updateSelectInput(session, "site_name", selected = character(0))
             updateSelectInput(session, "media_type", selected = "all")  
-            updateSelectizeInput(session, "values", choices = character(0), selected = character(0) )
-            updateSelectInput(session, "value", selected = character(0))
+            updateSelectizeInput(session, "field", choices = character(0), selected = character(0) )
+            updateSelectInput(session, "values", selected = character(0))
             if("date_time" %in% names(df)){
                 dmin <- as.Date(min(df$date_time, na.rm = TRUE))
                 dmax <- as.Date(max(df$date_time, na.rm = TRUE))
