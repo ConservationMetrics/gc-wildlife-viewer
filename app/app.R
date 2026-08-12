@@ -17,18 +17,6 @@
 # EXTERNAL DATA PATH -----------------------------------------------------
 APP_DATA_PATH <- Sys.getenv("APP_DATA_PATH", unset = "../data_mount")
 
-# INSTALL MISSING PACKAGES --------------------------------------------------
-# TODO: Romove from script so that app fails if a package was not installed in docker
-required_packages <- c("shiny", "bslib", "dplyr", "lubridate", "janitor", 
-                       "leaflet", "magick")
-
-missing_packages <- required_packages[!required_packages %in% installed.packages()[,"Package"]]
-
-if(length(missing_packages) > 0) {
-    message("Installing missing packages: ", paste(missing_packages, collapse = ", "))
-    install.packages(missing_packages, dependencies = TRUE)
-}
-
 # LOAD PACKAGES ------------------------------------------------------------
 library(shiny)
 library(bslib)
