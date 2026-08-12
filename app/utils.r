@@ -62,6 +62,7 @@
 #' as UTF-8 leaves invalid byte sequences that break Shiny/`jsonlite` (and
 #' show up as \code{�}). Characters like \code{ë} are fine once decoded to UTF-8.
 #'
+#' For future reference, a different approach to use `readr` R package is documented here: https://github.com/ConservationMetrics/gc-wildlife-viewer/pull/29#pullrequestreview-4920922074
 #' @param path Character scalar. Path to a CSV file.
 #' @param verbose Logical. If \code{TRUE}, report the encoding used.
 #' @return A data.frame with character columns marked UTF-8.
