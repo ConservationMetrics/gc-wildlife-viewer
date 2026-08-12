@@ -287,10 +287,10 @@ filtersServer <- function(id, data){
         observeEvent(input$clear, {
             df <- data()
             sites <- sort(unique(df$site_name))
-            updateSelectInput(session, "site_name", selected = sites)
+            updateSelectInput(session, "site_name", selected = character(0))
             updateSelectInput(session, "media_type", selected = "all")  
-            updateSelectizeInput(session, "values", choices = character(0), selected = character(0) )
-            updateSelectInput(session, "value", selected = character(0))
+            updateSelectizeInput(session, "field", choices = character(0), selected = character(0) )
+            updateSelectInput(session, "values", selected = character(0))
             if("date_time" %in% names(df)){
                 dmin <- as.Date(min(df$date_time, na.rm = TRUE))
                 dmax <- as.Date(max(df$date_time, na.rm = TRUE))
