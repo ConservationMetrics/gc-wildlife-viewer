@@ -18,10 +18,12 @@ RUN R -e "install.packages('magick', repos='https://cloud.r-project.org', type='
 # Install packages that depend on stringi from source (janitor and its deps)
 RUN R -e "install.packages(c('snakecase', 'janitor'), repos='https://cloud.r-project.org', type='source', Ncpus=2)"
 
-# Install remaining packages as binaries for speed
+# Install remaining packages as binaries for speed.
+# rocker/shiny:4.5.1 is Ubuntu noble — jammy binaries will not install reliably.
 RUN R -e "options(HTTPUserAgent = sprintf('R/%s R (%s)', getRversion(), paste(getRversion(), R.version['platform'], R.version['arch'], R.version['os']))); \
           pkgs <- c('shiny', 'bslib', 'dplyr', 'lubridate', 'leaflet'); \
-          install.packages(pkgs, repos='https://packagemanager.posit.co/cran/__linux__/jammy/latest', Ncpus=4)"
+          install.packages(pkgs, repos='https://packagemanager.posit.co/cran/__linux__/noble/latest', Ncpus=4); \
+          stopifnot(all(pkgs %in% rownames(installed.packages())))"
 
 # Remove default shiny apps
 RUN rm -rf /srv/shiny-server/*
