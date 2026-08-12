@@ -52,6 +52,7 @@
 load_metadata <- function(csv_path,
                           deployment_data_path,
                           rel_path_parts = c("deployment", "region", "camera","location_name"), 
+                          site_name_cols,
                           verbose = TRUE) {
     
     if (!file.exists(csv_path)) {
@@ -67,7 +68,7 @@ load_metadata <- function(csv_path,
         {if(!"camera"%in%names(.)){
             tidyr::separate_wider_delim(.,cols = relative_path,delim = "\\",names = rel_path_parts,cols_remove =FALSE)}
         }%>% 
-        mutate(camera=gsub(".*\\\\","",camera),site_name = camera, 
+        mutate(camera=gsub(".*\\\\","",camera),
                location_name =tolower(location_name),
                datetime=ymd_hms(date_time,tz = "UTC"))
     
@@ -77,7 +78,9 @@ load_metadata <- function(csv_path,
             janitor::clean_names() %>%
             mutate(deployment_datetime = mdy_hms(paste(deployment_date, deployment_time), tz = "UTC"),
                    retrieval_datetime = mdy_hms(paste(retrieval_date, retrieval_time), tz = "UTC"),
-                   location_name = tolower(location_name))
+                   location_name = tolower(location_name),
+                   site_name = paste(!!!syms(site_name_cols), sep = " - "))
+        
         meta <- meta %>%
             left_join(deploy,
                       by = join_by(location_name, region, camera == camera_name,

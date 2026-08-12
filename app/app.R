@@ -51,7 +51,9 @@ CONFIG <- list(
         # these are the column names into which we will split the
         # "relative_path" column from the timelapse export ImageData.csv.  They
         # are then used to join with the deployment.csv
-        rel_path_parts= c("deployment", "region", "camera","location_name")),
+        rel_path_parts= c("deployment", "region", "camera","location_name"),
+        site_name_cols = c("location_name", "camera_name", "region")
+    ),
     
     map = list(
         default_zoom = 6
@@ -100,6 +102,7 @@ META_DATA <- tryCatch({
         csv_path = CONFIG$images$csv_path,
         deployment_data_path = CONFIG$deployment_data$deployment_data_path,
         rel_path_parts = CONFIG$deployment_data$rel_path_parts,
+        site_name_cols = CONFIG$deployment_data$site_name_cols,
         verbose = TRUE
     )
     
