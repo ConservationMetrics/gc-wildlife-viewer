@@ -337,6 +337,9 @@ mapUI <- function(id, height="200px"){
             leafletOutput(map_id, height = "100%"),
             div(class = "map-resize-handle", title = "Drag to resize map")
         ),
+        # REVIEW: Is there a Shiny-native way to set up resize bars, to avoid
+        # needing to inject JavaScript?
+        # c.f. https://github.com/ConservationMetrics/gc-wildlife-viewer/pull/32#pullrequestreview-4929861068
         tags$script(HTML(sprintf("
             (function() {
                 const wrapId = '%s', mapId = '%s', key = 'gc-wildlife-map-height';
