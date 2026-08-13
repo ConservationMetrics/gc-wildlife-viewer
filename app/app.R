@@ -327,7 +327,50 @@ filtersServer <- function(id, data){
 # MAP MODULE (Leaflet)  ----------------------------------------------------
 mapUI <- function(id, height="200px"){
     ns <- NS(id)
-    leafletOutput(ns("map"), height = height)
+    wrap_id <- ns("map_wrap")
+    map_id  <- ns("map")
+    tagList(
+        div(
+            id = wrap_id,
+            class = "map-resize-wrap",
+            style = sprintf("height:%s;", height),
+            leafletOutput(map_id, height = "100%"),
+            div(class = "map-resize-handle", title = "Drag to resize map")
+        ),
+        tags$script(HTML(sprintf("
+            (function() {
+                const wrapId = '%s', mapId = '%s', key = 'gc-wildlife-map-height';
+                const minH = 140;
+                const maxH = () => Math.round(window.innerHeight * 0.7);
+                const invalidate = () => {
+                    try {
+                        const m = HTMLWidgets.find('#' + mapId);
+                        if (m && m.invalidateSize) m.invalidateSize();
+                    } catch (e) {}
+                };
+                const wrap = document.getElementById(wrapId);
+                if (!wrap || wrap.dataset.resizeInit) return;
+                wrap.dataset.resizeInit = '1';
+                const saved = localStorage.getItem(key);
+                if (saved) wrap.style.height = saved;
+                wrap.querySelector('.map-resize-handle').addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    const startY = e.clientY, startH = wrap.offsetHeight;
+                    const move = (ev) => {
+                        wrap.style.height = Math.min(maxH(), Math.max(minH, startH + ev.clientY - startY)) + 'px';
+                    };
+                    const up = () => {
+                        document.removeEventListener('pointermove', move);
+                        document.removeEventListener('pointerup', up);
+                        localStorage.setItem(key, wrap.style.height);
+                    };
+                    document.addEventListener('pointermove', move);
+                    document.addEventListener('pointerup', up);
+                });
+                new ResizeObserver(invalidate).observe(wrap);
+            })();
+        ", wrap_id, map_id)))
+    )
 }
 
 mapServer <- function(id, all_sites_df, filtered_sites, selected_site_rv) {
@@ -349,8 +392,11 @@ mapServer <- function(id, all_sites_df, filtered_sites, selected_site_rv) {
                     .groups = "drop"
                 )
             
-            leaflet(pts) %>%
-                addTiles() %>%
+            leaflet(pts, options = leafletOptions(attributionControl = FALSE)) %>%
+                # TODO: Allow users to set their basemap option, or do 
+                # https://github.com/ConservationMetrics/gc-wildlife-viewer/issues/6
+                addProviderTiles(providers$Esri.WorldImagery) %>%
+                addProviderTiles(providers$CartoDB.DarkMatterOnlyLabels) %>%
                 addCircleMarkers(
                     lng = ~longitude,
                     lat = ~latitude,
@@ -761,6 +807,32 @@ ui <- page_fillable(
     tags$style(HTML("
         .bslib-sidebar-layout { height: calc(100vh - 60px); }
         .sidebar { overflow-y: auto !important; }
+        .map-resize-wrap {
+            display: flex;
+            flex-direction: column;
+            min-height: 140px;
+            max-height: 70vh;
+        }
+        .map-resize-wrap > .html-widget {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: 100% !important;
+        }
+        .map-resize-handle {
+            flex: 0 0 12px;
+            cursor: ns-resize;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ecf0f1;
+        }
+        .map-resize-handle::before {
+            content: '';
+            width: 36px;
+            height: 4px;
+            border-radius: 2px;
+            background: #95a5a6;
+        }
     ")),
     
     h3("Guardian Connector: Wildlife Viewer", class = "mb-3"),
