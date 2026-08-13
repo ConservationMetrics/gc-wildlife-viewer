@@ -1,3 +1,7 @@
+# Resize Leaflet map and set map source to World Imagery plus labels- #30
+
+* introduces a feature to resize the Leaflet map (vertically), and set the map source to ESRI World Imagery plus CartoDB labels.
+
 # Read CSV as UTF-8- #29
 
 * introduces a fix to read the CSV as UTF-8 for cases when the CSV is Windows-1252 encoded, and some bytes are invalid UTF-8, which shows up as � and can crash the select input.
