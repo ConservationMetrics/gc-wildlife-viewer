@@ -790,6 +790,7 @@ drawerServer <- function(id, trigger_data, all_data, primary_fields = CONFIG$exp
 
 # UI -----------------------------------------------------------------------
 ui <- page_fillable(
+    title = "Guardian Connector Wildlife Viewer",
     theme = bs_theme(bootswatch = "flatly"),
     
     tags$script(HTML("
