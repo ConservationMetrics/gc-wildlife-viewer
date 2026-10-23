@@ -1,3 +1,5 @@
+FROM quay.io/oauth2-proxy/oauth2-proxy:v7.15.5 AS oauth2-proxy
+
 FROM rocker/shiny:4.6.0
 
 # Install all system libraries needed for magick, stringi, and terra
@@ -43,6 +45,9 @@ RUN chown -R shiny:shiny /var/lib/shiny-server /var/log/shiny-server /srv/shiny-
 RUN mkdir -p /data_mount
 RUN echo "APP_DATA_PATH=/data_mount" > /srv/shiny-server/.Renviron
 
+COPY --from=oauth2-proxy /bin/oauth2-proxy /usr/local/bin/oauth2-proxy
+COPY --chmod=755 entrypoint.sh /usr/local/bin/entrypoint.sh
+
 # Configure app to run as Unix user 'shiny'
 USER shiny
 COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
@@ -50,5 +55,5 @@ COPY shiny-server.conf /etc/shiny-server/shiny-server.conf
 # Expose HTTP port
 EXPOSE 3838
 
-# Run shiny-server
-CMD ["/usr/bin/shiny-server"]
+# Run Shiny directly or behind oauth2-proxy, depending on AUTH_ENABLED
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
