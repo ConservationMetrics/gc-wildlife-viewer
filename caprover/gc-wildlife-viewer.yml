@@ -1,0 +1,86 @@
+captainVersion: 4
+
+services:
+  $$cap_appname:
+    image: $$cap_gc_wildlife_viewer_docker_image
+    restart: unless-stopped
+    volumes:
+      - $$cap_persistent_storage:/data_mount
+    environment:
+      APP_DATA_PATH: /data_mount
+      AUTH_ENABLED: $$cap_auth_enabled
+      OAUTH2_PROXY_OIDC_ISSUER_URL: $$cap_auth0_issuer_url
+      OAUTH2_PROXY_CLIENT_ID: $$cap_auth0_client_id
+      OAUTH2_PROXY_CLIENT_SECRET: $$cap_auth0_client_secret
+      OAUTH2_PROXY_REDIRECT_URL: $$cap_oauth2_redirect_url
+      OAUTH2_PROXY_COOKIE_SECRET: $$cap_oauth2_cookie_secret
+    caproverExtra:
+      containerHttpPort: "3838"
+
+caproverOneClickApp:
+  instructions:
+    start: |-
+      Guardian Connector Wildlife Viewer reads camera-trap media from
+      datalake/camera_traps and keeps its protected CSV copy in gc-wildlife.
+      The template mounts the host persistent-storage root at /data_mount so
+      both directories are available.
+
+      Leave Enable Auth0 at false to deploy without an application login. Set
+      it to true only after creating an Auth0 Regular Web Application whose
+      Allowed Callback URL is
+      https://<this-app-host>/oauth2/callback. Login is limited to Auth0 users
+      with the Member or Admin role. The tenant login flow must add those roles
+      to the ID token as urn:gc:roles.
+
+      When Auth0 is enabled, enable Force HTTPS after installation and do not
+      also enable CapRover HTTP Basic Auth.
+    end: |-
+      GC Wildlife Viewer is deploying and will be available within a minute.
+      Camera-trap files are read from
+      $$cap_persistent_storage/datalake/camera_traps. When Auth0 is enabled,
+      every Shiny and media path requires a Member or Admin login.
+  displayName: Guardian Connector Wildlife Viewer
+  isOfficial: true
+  description: Explore camera-trap images, videos, and deployment data.
+  documentation: https://github.com/ConservationMetrics/gc-wildlife-viewer
+  variables:
+    - id: "$$cap_gc_wildlife_viewer_docker_image"
+      label: GC Wildlife Viewer Docker Image
+      defaultValue: "<YOUR_REGISTRY>/gc-wildlife-viewer:latest"
+      description: Image name and tag for gc-wildlife-viewer.
+
+    - id: "$$cap_persistent_storage"
+      label: Host persistent-storage path
+      defaultValue: "/mnt/persistent-storage"
+      description: Host path containing the datalake and gc-wildlife directories.
+
+    - id: "$$cap_auth_enabled"
+      label: Enable Auth0
+      defaultValue: "false"
+      validRegex: /^(true|false)$/
+      description: true requires an Auth0 user with the Member or Admin role. false leaves access protection to CapRover.
+
+    - id: "$$cap_auth0_issuer_url"
+      label: Auth0 issuer URL
+      defaultValue: ""
+      description: Required when Auth0 is enabled. Include the trailing slash, for example https://<tenant>.us.auth0.com/
+
+    - id: "$$cap_auth0_client_id"
+      label: Auth0 client ID
+      defaultValue: ""
+      description: Required when Auth0 is enabled. Client ID of the Regular Web Application created for this viewer.
+
+    - id: "$$cap_auth0_client_secret"
+      label: Auth0 client secret
+      defaultValue: ""
+      description: Required when Auth0 is enabled. Client secret of the same Auth0 application.
+
+    - id: "$$cap_oauth2_redirect_url"
+      label: OAuth redirect URL
+      defaultValue: ""
+      description: Required when Auth0 is enabled. Must be https://<this-app-host>/oauth2/callback and match the Auth0 Allowed Callback URL exactly.
+
+    - id: "$$cap_oauth2_cookie_secret"
+      label: Session cookie secret
+      defaultValue: "$$cap_gen_random_hex(32)"
+      description: Random secret used to sign the login cookie.

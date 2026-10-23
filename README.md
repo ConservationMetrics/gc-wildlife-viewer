@@ -71,6 +71,72 @@ The easiest way to get the data into the `camera_traps` folder is to use the [Fi
 - Full export from Timelapse: Use **File → Export or import data to/from a csv file → Export all data (folder data, image/video data) to csv files...** within Timelapse. 
 - Configuring the path to the data in the app (currently, `camera_traps` and `deployment.csv` are hardcoded) is not yet supported.
 
+## Access protection
+
+The container supports either CapRover HTTP Basic Auth or Auth0. Use one of
+these controls, not both:
+
+- Auth0 gives each approved Guardian Connector user their own login.
+- Basic Auth uses one shared username and password.
+
+### Why authentication is outside the R app
+
+The [`curso-r/auth0`](https://github.com/curso-r/auth0) package wraps a Shiny
+app's UI and server functions. It is not a request-level authorization
+boundary: it does not protect Shiny resource paths such as the viewer's
+`/camimg/` and `/thumbs/` media before requests reach Shiny, and it does not
+natively enforce the Guardian Connector `urn:gc:roles` claim.
+
+This image instead runs
+[`oauth2-proxy`](https://oauth2-proxy.github.io/oauth2-proxy/) in front of
+Shiny when Auth0 is enabled. The proxy checks every HTTP request and WebSocket
+connection before forwarding it. Shiny listens only on the container's
+loopback interface in this mode, so media and application sessions cannot
+bypass the proxy.
+
+### Auth0 configuration
+
+Set `AUTH_ENABLED=true` to require Auth0 login. The ID token must include
+`Member` or `Admin` in `urn:gc:roles`, the claim the Guardian Connector
+tenant's **Add Roles Claim** Post-Login action copies from the user's Auth0
+roles. `Guest`, `SignedIn`, and users without the claim receive `403`.
+
+Create one Auth0 **Regular Web Application** for each deployed viewer:
+
+- Allowed Callback URL: `https://<host>/oauth2/callback`
+- Allowed Logout URL: `https://<host>/`
+- Allowed Web Origin: `https://<host>`
+- Connections: the tenant's existing database and Google connections
+
+No Auth0 Management API scopes are required. Configure these container
+environment variables:
+
+- `AUTH_ENABLED=true`
+- `OAUTH2_PROXY_OIDC_ISSUER_URL`: the tenant issuer, including its trailing
+  slash, for example `https://<tenant>.us.auth0.com/`
+- `OAUTH2_PROXY_CLIENT_ID`: the Regular Web Application client ID
+- `OAUTH2_PROXY_CLIENT_SECRET`: the application client secret
+- `OAUTH2_PROXY_REDIRECT_URL`: `https://<host>/oauth2/callback`
+- `OAUTH2_PROXY_COOKIE_SECRET`: a 32-byte session-cookie secret
+
+Generate the cookie secret with:
+
+```bash
+openssl rand -base64 32 | tr '+/' '-_'
+```
+
+`OAUTH2_PROXY_COOKIE_SECURE` defaults to `true`. Set it to `false` only when
+testing with an `http://localhost:3838/oauth2/callback` redirect.
+
+`/oauth2/sign_out` clears the viewer session. To clear the Auth0 session too,
+link to:
+
+```text
+/oauth2/sign_out?rd=<urlencoded https://<tenant>.us.auth0.com/v2/logout?client_id=<client-id>&returnTo=https://<host>/>
+```
+
+The `returnTo` URL must match an Auth0 Allowed Logout URL.
+
 ## Deployment with Docker
 
 ### 1. Build the Docker Image
@@ -92,11 +158,25 @@ docker run -p 3838:3838 -v "$(pwd)/data_mount:/data_mount" guardiancr.azurecr.io
 
 Then open http://localhost:3838
 
+This starts without authentication because `AUTH_ENABLED` defaults to `false`.
+For local Auth0 testing, pass the variables from
+[Auth0 configuration](#auth0-configuration), use a localhost callback, and
+set `OAUTH2_PROXY_COOKIE_SECURE=false`.
+
 > [!TIP]
 >
 > You can run this image tag locally without needing to authenticate to the container registry.
 
 ### 3. Deploy to CapRover
+
+Prefer the one-click app in
+[`caprover/gc-wildlife-viewer.yml`](caprover/gc-wildlife-viewer.yml). It
+configures port `3838`, the data mount, and the optional Auth0 environment
+variables. The default host mount is `/mnt/persistent-storage`, which makes
+both `datalake/camera_traps` and `gc-wildlife` available under
+`/data_mount`.
+
+For a manual deployment:
 
 1. Push the Docker image to a container registry that's hooked up in your CapRover deployment (CMI uses `guardiancr.azurecr.io`), e.g.
 
@@ -113,13 +193,22 @@ Then open http://localhost:3838
 
 4. In **App Configs > Persistent Directories**, add a volume mount:
    - Path in App: `/data_mount`
-   - Map to a host path or named volume containing your data
+   - Path on Host: `/mnt/persistent-storage`
 
-5. If you need password protection, in **HTTP Settings > Edit HTTP Basic Auth** assign a username and password. This approach does not allow multiple different usernames.
+5. Choose one access control:
+
+   - For Auth0, add the environment variables from
+     [Auth0 configuration](#auth0-configuration), enable **Force HTTPS**, and
+     leave CapRover HTTP Basic Auth off.
+   - For a shared password, leave `AUTH_ENABLED=false` and configure
+     **HTTP Settings > Edit HTTP Basic Auth**.
 
 6. Set the **Container HTTP Port** to `3838`.
 
 7. Under the **Deployment** tab, use "Method 6: Deploy via ImageName"
+
+When Auth0 is enabled, `/ping` and `/ready` remain unauthenticated for
+container health checks. All Shiny and media paths require a session.
 
 ## Development Notes
 
@@ -192,3 +281,16 @@ That is an indicator that you might be missing an R package, or that something i
 4. Check the logs on the container in `/var/log/shiny-server/` for more information.
 
 See https://github.com/rstudio/shiny-server/issues/353 for more information.
+
+For authentication problems:
+
+- **`AUTH_ENABLED=true requires`:** provide all five required
+  `OAUTH2_PROXY_*` variables.
+- **Login succeeds but the viewer remains anonymous:** verify that the
+  callback URL, Auth0 Allowed Callback URL, and public host match exactly.
+- **403 after login:** verify that the account has the Auth0 `Member` or
+  `Admin` role and that the ID token contains `urn:gc:roles`.
+- **Redirect or secure-cookie errors:** use HTTPS publicly.
+  `OAUTH2_PROXY_COOKIE_SECURE=false` is only for local HTTP testing.
+- **Unexpected proxy exit:** check the container logs for OIDC discovery or
+  upstream startup errors.
